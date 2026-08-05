@@ -4,6 +4,8 @@ from app.rag.retriever import Retriever
 
 from app.llm.generator import AnswerGenerator
 
+from app.core.logger import logger
+
 
 class ChatService:
 
@@ -19,62 +21,59 @@ class ChatService:
 
         self.generator = AnswerGenerator()
 
-
     def ask(
         self,
         question: str
-    ):
+    ) -> dict:
 
         question = question.strip()
 
+        logger.info(
+            f"Question: {question}"
+        )
 
-        # 1. Embedding câu hỏi
+        # 1. Sinh embedding
         query_vector = self.embedder.embed_query(
             question
         )
 
-
-        # 2. Retrieve context
+        # 2. Retrieve
         results = self.retriever.search(
             query_vector,
             top_k=3
         )
 
-
         contexts = []
         sources = []
 
+        for item in results:
 
-        documents = results["documents"][0]
-        metadatas = results["metadatas"][0]
-        distances = results["distances"][0]
-
-
-        for doc, metadata, distance in zip(
-            documents,
-            metadatas,
-            distances
-        ):
+            metadata = item["metadata"]
 
             contexts.append(
                 f"""
 Source:
-{metadata}
+{metadata.get("source")}
+
+Page:
+{metadata.get("page")}
 
 Content:
-{doc}
+{item["document"]}
 """
             )
-
 
             sources.append(
                 {
                     "source": metadata.get("source"),
                     "page": metadata.get("page"),
-                    "distance": distance
+                    "distance": round(item["distance"], 3)
                 }
             )
 
+        logger.info(
+            f"Retrieved {len(contexts)} contexts"
+        )
 
         # 3. Generate answer
         answer = self.generator.generate(
@@ -82,8 +81,11 @@ Content:
             contexts
         )
 
+        logger.info(
+            "Answer generated successfully"
+        )
 
-        # 4. Response
+        # 4. Return
         return {
             "question": question,
             "answer": answer,

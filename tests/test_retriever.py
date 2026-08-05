@@ -24,6 +24,7 @@ results = retriever.search(
 )
 
 
+
 print("====================")
 
 for i, doc in enumerate(results["documents"][0]):
@@ -38,3 +39,4 @@ for i, doc in enumerate(results["documents"][0]):
     )
 
     print(doc[:500])
+

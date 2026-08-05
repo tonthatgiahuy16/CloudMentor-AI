@@ -1227,3 +1227,459 @@
 2026-08-06 00:19:21,079 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
 2026-08-06 00:19:21,350 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
 2026-08-06 00:19:21,377 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 05:49:22,111 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 05:49:22,112 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 05:49:22,657 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:22,684 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:22,959 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:22,961 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 05:49:22,976 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:22,983 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 05:49:23,260 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:23,279 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:23,559 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:23,582 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 05:49:23,860 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:23,871 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:24,145 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:24,159 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:24,435 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:24,732 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:24,748 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:25,126 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:25,410 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:49:25,759 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 05:49:25,789 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:26,067 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 05:49:26,068 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:26,351 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:26,362 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 05:49:26,635 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:26,636 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:26,915 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:26,920 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 05:49:26,938 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:27,213 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:27,233 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:27,530 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:27,542 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:27,832 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:27,859 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:28,151 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 05:49:28,435 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 05:49:32,524 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:49:32,845 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:49:32,860 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 05:49:33,144 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:49:33,162 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 05:50:51,939 | INFO | CloudMentorAI | Question: Compute là gì?
+2026-08-06 05:50:54,843 | INFO | CloudMentorAI | Retrieved 2 documents
+2026-08-06 05:55:01,829 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 05:55:01,830 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 05:55:02,650 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:02,652 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 05:55:02,664 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:02,974 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:02,985 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:02,987 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 05:55:03,257 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:03,272 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:03,549 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:03,562 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 05:55:03,840 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:03,857 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:04,127 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:04,138 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:04,419 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:04,703 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:04,714 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:05,098 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:05,376 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:55:05,590 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:05,697 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 05:55:05,868 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:05,995 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 05:55:06,158 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:06,305 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 05:55:06,446 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:06,576 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:06,716 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:06,729 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:06,860 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 05:55:07,002 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:07,012 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:07,305 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:07,319 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:07,619 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:07,632 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:07,936 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 05:55:08,214 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 05:55:11,555 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:55:11,864 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 05:55:11,876 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 05:55:12,166 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 05:55:12,191 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 05:55:42,087 | INFO | CloudMentorAI | Question: tribute
+2026-08-06 05:55:42,514 | INFO | CloudMentorAI | Retrieved 0 documents
+2026-08-06 05:55:42,514 | INFO | CloudMentorAI | Retrieved 0 contexts
+2026-08-06 05:55:42,515 | INFO | google_genai.models | AFC is enabled with max remote calls: 10.
+2026-08-06 05:55:44,651 | INFO | httpx | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-06 05:55:44,662 | INFO | CloudMentorAI | Answer generated successfully
+2026-08-06 05:55:58,807 | INFO | CloudMentorAI | Question: Compute
+2026-08-06 05:55:59,031 | INFO | CloudMentorAI | Retrieved 3 documents
+2026-08-06 05:55:59,031 | INFO | CloudMentorAI | Retrieved 3 contexts
+2026-08-06 05:55:59,032 | INFO | google_genai.models | AFC is enabled with max remote calls: 10.
+2026-08-06 05:56:05,256 | INFO | httpx | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-06 05:56:05,260 | INFO | CloudMentorAI | Answer generated successfully
+2026-08-06 05:56:17,735 | INFO | CloudMentorAI | Question: Compute là gì
+2026-08-06 05:56:17,918 | INFO | CloudMentorAI | Retrieved 1 documents
+2026-08-06 05:56:17,919 | INFO | CloudMentorAI | Retrieved 1 contexts
+2026-08-06 05:56:17,919 | INFO | google_genai.models | AFC is enabled with max remote calls: 10.
+2026-08-06 05:56:27,801 | INFO | httpx | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-06 05:56:27,805 | INFO | CloudMentorAI | Answer generated successfully
+2026-08-06 06:00:32,198 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:00:32,199 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:00:32,730 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:32,747 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:33,032 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:33,033 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 06:00:33,044 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:33,045 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:00:33,328 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:33,340 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:33,632 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:33,649 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:00:33,930 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:33,948 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:34,241 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:34,257 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:34,548 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:34,827 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:34,841 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:35,233 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:35,525 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:00:35,757 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:35,836 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:00:36,055 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:36,151 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:00:36,336 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:36,487 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:00:36,625 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:36,781 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:36,907 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:36,916 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:37,098 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:00:37,225 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:37,238 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:37,527 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:37,539 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:37,830 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:37,843 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:38,133 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:38,411 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:00:41,377 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:00:41,676 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:41,691 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:41,974 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:00:41,989 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:00:54,670 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:00:54,671 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:00:55,252 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:55,268 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:55,561 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:55,589 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:55,590 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:00:55,873 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:55,875 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 06:00:55,890 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:56,206 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:56,217 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:00:56,493 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:56,507 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:56,786 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:56,799 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:57,075 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:57,363 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:57,381 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:57,737 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:58,027 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:00:58,209 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:58,334 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:00:58,501 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:58,655 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:00:58,778 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:58,952 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:00:59,068 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:59,239 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:00:59,360 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:59,374 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:59,535 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:00:59,662 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:59,675 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:00:59,968 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:00:59,980 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:00,262 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:00,274 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:00,568 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:00,847 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:01:04,809 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:05,144 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:05,158 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:05,450 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:05,466 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:01:17,956 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:01:18,451 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:18,453 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 06:01:18,466 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:18,757 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:18,769 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:18,773 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:01:19,060 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:19,072 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:19,347 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:19,360 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:01:19,676 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:19,686 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:19,973 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:19,988 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:20,289 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:20,574 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:20,586 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:20,958 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:21,259 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:21,428 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:21,558 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:01:21,713 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:21,945 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:01:22,008 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:22,259 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:01:22,288 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:22,546 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:22,576 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:22,586 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:22,828 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:01:22,884 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:22,898 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:23,189 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:23,198 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:23,493 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:23,503 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:23,802 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:24,096 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:01:27,187 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:27,513 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:27,525 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:27,812 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:27,825 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:01:27,900 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:01:27,901 | ERROR | fastapi | Form data requires "python-multipart" to be installed. 
+You can install "python-multipart" with: 
+
+pip install python-multipart
+
+2026-08-06 06:01:35,315 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:01:35,838 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:35,840 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 06:01:35,853 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:36,141 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:36,154 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:36,159 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:01:36,443 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:36,455 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:36,734 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:36,747 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:01:37,026 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:37,038 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:37,315 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:37,326 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:37,608 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:37,885 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:37,899 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:38,234 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:38,525 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:38,707 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:38,829 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:01:38,983 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:39,147 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:01:39,260 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:39,487 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:01:39,535 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:39,761 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:39,805 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:39,818 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:40,044 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:01:40,108 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:40,120 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:40,402 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:40,416 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:40,715 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:40,727 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:41,016 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:01:41,294 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:01:44,020 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:44,326 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:01:44,342 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:01:44,625 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:01:44,662 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:01:45,102 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:01:45,104 | ERROR | fastapi | Form data requires "python-multipart" to be installed. 
+You can install "python-multipart" with: 
+
+pip install python-multipart
+
+2026-08-06 06:02:18,768 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:02:19,782 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:19,783 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-06 06:02:19,799 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:20,086 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:20,098 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:20,100 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:02:20,395 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:20,409 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:20,715 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:20,727 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:02:21,060 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:21,071 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:21,369 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:21,381 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:21,661 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:21,953 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:21,966 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:22,401 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:22,679 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:23,115 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:02:23,226 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:23,427 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:02:23,516 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:23,736 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:02:23,809 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:24,025 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:24,132 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:24,310 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:02:24,423 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:24,438 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:24,720 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:24,731 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:25,018 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:25,033 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:25,324 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:25,339 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:25,641 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:25,930 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:02:29,178 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:29,510 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:29,522 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:29,802 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:29,817 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:02:30,066 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:02:32,190 | INFO | CloudMentorAI | Vector collection initialized: cloudmentor
+2026-08-06 06:02:32,192 | INFO | sentence_transformers.base.model | No device provided, using cpu
+2026-08-06 06:02:32,476 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:32,489 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:32,778 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:32,791 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:32,794 | INFO | sentence_transformers.base.model | Loading SentenceTransformer model from BAAI/bge-m3.
+2026-08-06 06:02:33,079 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:33,092 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:33,369 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:33,381 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/README.md "HTTP/1.1 200 OK"
+2026-08-06 06:02:33,657 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:33,672 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/modules.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:33,963 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:33,976 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:34,272 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:34,557 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:34,568 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:34,887 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:35,171 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:35,466 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:35,476 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/main "HTTP/1.1 200 OK"
+2026-08-06 06:02:35,748 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:35,782 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/discussions?p=0 "HTTP/1.1 200 OK"
+2026-08-06 06:02:36,035 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/video_preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:36,096 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/commits/refs%2Fpr%2F130 "HTTP/1.1 200 OK"
+2026-08-06 06:02:36,331 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/preprocessor_config.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:36,374 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:36,617 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:36,634 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:36,657 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/refs%2Fpr%2F130/model.safetensors "HTTP/1.1 302 Found"
+2026-08-06 06:02:36,922 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:36,934 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:37,252 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:37,265 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:37,557 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:37,571 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:37,870 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-08-06 06:02:38,221 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-06 06:02:42,683 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:43,023 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/BAAI/bge-m3/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-06 06:02:43,036 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-m3/5617a9f61b028005a4858fdac845db406aefb181/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-08-06 06:02:43,327 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-m3 "HTTP/1.1 200 OK"
+2026-08-06 06:02:43,341 | INFO | CloudMentorAI | Loaded embedding model: BAAI/bge-m3
+2026-08-06 06:03:40,358 | INFO | CloudMentorAI | Loading PDF: Ch2 - MoHinh Dv và Ha tang DTDM.pdf
+2026-08-06 06:03:40,376 | WARNING | pypdf._reader | Ignoring wrong pointing object 8 0 (offset 0)
+2026-08-06 06:03:40,377 | WARNING | pypdf._reader | Ignoring wrong pointing object 10 0 (offset 0)
+2026-08-06 06:03:40,378 | WARNING | pypdf._reader | Ignoring wrong pointing object 12 0 (offset 0)
+2026-08-06 06:03:40,379 | WARNING | pypdf._reader | Ignoring wrong pointing object 15 0 (offset 0)
+2026-08-06 06:03:40,381 | WARNING | pypdf._reader | Ignoring wrong pointing object 28 0 (offset 0)
+2026-08-06 06:03:40,382 | WARNING | pypdf._reader | Ignoring wrong pointing object 31 0 (offset 0)
+2026-08-06 06:03:40,383 | WARNING | pypdf._reader | Ignoring wrong pointing object 56 0 (offset 0)
+2026-08-06 06:03:40,384 | WARNING | pypdf._reader | Ignoring wrong pointing object 58 0 (offset 0)
+2026-08-06 06:03:40,384 | WARNING | pypdf._reader | Ignoring wrong pointing object 61 0 (offset 0)
+2026-08-06 06:03:40,385 | WARNING | pypdf._reader | Ignoring wrong pointing object 63 0 (offset 0)
+2026-08-06 06:03:40,386 | WARNING | pypdf._reader | Ignoring wrong pointing object 73 0 (offset 0)
+2026-08-06 06:03:40,388 | WARNING | pypdf._reader | Ignoring wrong pointing object 75 0 (offset 0)
+2026-08-06 06:03:40,389 | WARNING | pypdf._reader | Ignoring wrong pointing object 81 0 (offset 0)
+2026-08-06 06:03:40,390 | WARNING | pypdf._reader | Ignoring wrong pointing object 103 0 (offset 0)
+2026-08-06 06:03:40,391 | WARNING | pypdf._reader | Ignoring wrong pointing object 110 0 (offset 0)
+2026-08-06 06:03:40,393 | WARNING | pypdf._reader | Ignoring wrong pointing object 112 0 (offset 0)
+2026-08-06 06:03:40,394 | WARNING | pypdf._reader | Ignoring wrong pointing object 128 0 (offset 0)
+2026-08-06 06:03:40,395 | WARNING | pypdf._reader | Ignoring wrong pointing object 165 0 (offset 0)
+2026-08-06 06:03:40,397 | WARNING | pypdf._reader | Ignoring wrong pointing object 167 0 (offset 0)
+2026-08-06 06:03:40,398 | WARNING | pypdf._reader | Ignoring wrong pointing object 169 0 (offset 0)
+2026-08-06 06:03:40,399 | WARNING | pypdf._reader | Ignoring wrong pointing object 176 0 (offset 0)
+2026-08-06 06:03:40,401 | WARNING | pypdf._reader | Ignoring wrong pointing object 178 0 (offset 0)
+2026-08-06 06:03:40,402 | WARNING | pypdf._reader | Ignoring wrong pointing object 188 0 (offset 0)
+2026-08-06 06:03:40,404 | WARNING | pypdf._reader | Ignoring wrong pointing object 190 0 (offset 0)
+2026-08-06 06:03:40,408 | WARNING | pypdf._reader | Ignoring wrong pointing object 192 0 (offset 0)
+2026-08-06 06:03:40,409 | WARNING | pypdf._reader | Ignoring wrong pointing object 198 0 (offset 0)
+2026-08-06 06:03:40,411 | WARNING | pypdf._reader | Ignoring wrong pointing object 200 0 (offset 0)
+2026-08-06 06:03:40,412 | WARNING | pypdf._reader | Ignoring wrong pointing object 207 0 (offset 0)
+2026-08-06 06:03:40,413 | WARNING | pypdf._reader | Ignoring wrong pointing object 223 0 (offset 0)
+2026-08-06 06:03:40,415 | WARNING | pypdf._reader | Ignoring wrong pointing object 225 0 (offset 0)
+2026-08-06 06:03:40,419 | WARNING | pypdf._reader | Ignoring wrong pointing object 241 0 (offset 0)
+2026-08-06 06:03:40,420 | WARNING | pypdf._reader | Ignoring wrong pointing object 243 0 (offset 0)
+2026-08-06 06:03:40,424 | WARNING | pypdf._reader | Ignoring wrong pointing object 245 0 (offset 0)
+2026-08-06 06:03:40,425 | WARNING | pypdf._reader | Ignoring wrong pointing object 247 0 (offset 0)
+2026-08-06 06:03:40,426 | WARNING | pypdf._reader | Ignoring wrong pointing object 262 0 (offset 0)
+2026-08-06 06:03:40,428 | WARNING | pypdf._reader | Ignoring wrong pointing object 264 0 (offset 0)
+2026-08-06 06:03:40,429 | WARNING | pypdf._reader | Ignoring wrong pointing object 266 0 (offset 0)
+2026-08-06 06:03:40,436 | WARNING | pypdf._reader | Ignoring wrong pointing object 277 0 (offset 0)
+2026-08-06 06:03:40,438 | WARNING | pypdf._reader | Ignoring wrong pointing object 279 0 (offset 0)
+2026-08-06 06:03:40,442 | WARNING | pypdf._reader | Ignoring wrong pointing object 281 0 (offset 0)
+2026-08-06 06:03:40,444 | WARNING | pypdf._reader | Ignoring wrong pointing object 288 0 (offset 0)
+2026-08-06 06:03:40,445 | WARNING | pypdf._reader | Ignoring wrong pointing object 290 0 (offset 0)
+2026-08-06 06:03:40,448 | WARNING | pypdf._reader | Ignoring wrong pointing object 292 0 (offset 0)
+2026-08-06 06:03:40,449 | WARNING | pypdf._reader | Ignoring wrong pointing object 294 0 (offset 0)
+2026-08-06 06:03:40,451 | WARNING | pypdf._reader | Ignoring wrong pointing object 314 0 (offset 0)
+2026-08-06 06:03:40,453 | WARNING | pypdf._reader | Ignoring wrong pointing object 347 0 (offset 0)
+2026-08-06 06:03:40,456 | WARNING | pypdf._reader | Ignoring wrong pointing object 359 0 (offset 0)
+2026-08-06 06:03:40,457 | WARNING | pypdf._reader | Ignoring wrong pointing object 361 0 (offset 0)
+2026-08-06 06:03:40,459 | WARNING | pypdf._reader | Ignoring wrong pointing object 402 0 (offset 0)
+2026-08-06 06:03:40,460 | WARNING | pypdf._reader | Ignoring wrong pointing object 421 0 (offset 0)
+2026-08-06 06:03:40,461 | WARNING | pypdf._reader | Ignoring wrong pointing object 452 0 (offset 0)
+2026-08-06 06:03:40,462 | WARNING | pypdf._reader | Ignoring wrong pointing object 463 0 (offset 0)
+2026-08-06 06:03:40,466 | WARNING | pypdf._reader | Ignoring wrong pointing object 513 0 (offset 0)
+2026-08-06 06:03:40,467 | WARNING | pypdf._reader | Ignoring wrong pointing object 515 0 (offset 0)
+2026-08-06 06:03:40,469 | WARNING | pypdf._reader | Ignoring wrong pointing object 534 0 (offset 0)
+2026-08-06 06:03:40,470 | WARNING | pypdf._reader | Ignoring wrong pointing object 536 0 (offset 0)
+2026-08-06 06:03:40,472 | WARNING | pypdf._reader | Ignoring wrong pointing object 543 0 (offset 0)
+2026-08-06 06:03:40,473 | WARNING | pypdf._reader | Ignoring wrong pointing object 564 0 (offset 0)
+2026-08-06 06:03:40,474 | WARNING | pypdf._reader | Ignoring wrong pointing object 566 0 (offset 0)
+2026-08-06 06:03:40,476 | WARNING | pypdf._reader | Ignoring wrong pointing object 599 0 (offset 0)
+2026-08-06 06:03:40,477 | WARNING | pypdf._reader | Ignoring wrong pointing object 611 0 (offset 0)
+2026-08-06 06:03:40,478 | WARNING | pypdf._reader | Ignoring wrong pointing object 627 0 (offset 0)
+2026-08-06 06:03:40,483 | WARNING | pypdf._reader | Ignoring wrong pointing object 662 0 (offset 0)
+2026-08-06 06:03:40,486 | WARNING | pypdf._reader | Ignoring wrong pointing object 664 0 (offset 0)
+2026-08-06 06:03:40,487 | WARNING | pypdf._reader | Ignoring wrong pointing object 666 0 (offset 0)
+2026-08-06 06:03:46,410 | INFO | CloudMentorAI | Loaded 116 pages from Ch2 - MoHinh Dv và Ha tang DTDM.pdf
