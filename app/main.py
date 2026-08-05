@@ -1,12 +1,22 @@
 from fastapi import FastAPI
 
+from app.api.chat import router
+
+
 app = FastAPI(
-    title="CloudMentor AI",
-    version="1.0.0"
+    title="CloudMentor AI"
 )
+
+
+app.include_router(
+    router
+)
+
 
 @app.get("/")
 def root():
+
     return {
-        "message": "CloudMentor AI is running!"
+        "message":
+        "CloudMentor AI API running"
     }

@@ -19,6 +19,9 @@ class EmbeddingService:
             f"Loaded embedding model: {model_name}"
         )
 
+    # ==========================
+    # Embedding cho tài liệu
+    # ==========================
 
     def embed(
         self,
@@ -40,3 +43,18 @@ class EmbeddingService:
         )
 
         return vectors
+
+    # ==========================
+    # Embedding cho câu hỏi
+    # ==========================
+
+    def embed_query(
+        self,
+        query: str
+    ):
+
+        vector = self.model.encode(
+            query
+        )
+
+        return vector

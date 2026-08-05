@@ -22,7 +22,7 @@ results = retriever.search(
     query_vector,
     top_k=10
 )
-print(results)
+
 
 print("====================")
 

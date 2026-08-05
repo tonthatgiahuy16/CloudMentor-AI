@@ -35,21 +35,25 @@ class VectorStore:
         ids = []
         documents = []
         metadatas = []
+        vectors = []
 
 
-        for chunk in chunks:
+        for i,  chunk in enumerate(chunks):
 
             ids.append(chunk.id)
 
             documents.append(
                 chunk.text
             )
+            vectors.append(
+                embeddings[i].tolist()
+            )
 
             metadatas.append(
                 {
                     "page": chunk.page,
                     "source": chunk.source,
-                    "chunk_index": chunk.chunk_index
+                    
                 }
             )
 
