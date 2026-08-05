@@ -37,6 +37,7 @@ class TextChunker:
                 chunks.append(
                     Chunk(
                         id=str(uuid.uuid4()),
+                        chunk_index=len(chunks),
                         page=document.page,
                         source=document.source,
                         text=chunk_text
