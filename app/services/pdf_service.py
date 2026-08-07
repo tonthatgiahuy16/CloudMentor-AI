@@ -1,23 +1,22 @@
-from app.rag.loader import PDFLoader
-from app.rag.cleaner import TextCleaner
-from app.rag.chunker import TextChunker
-from app.rag.embedder import EmbeddingService
-from app.rag.vector_store import VectorStore
+from app.pipeline.extract_pipeline import ExtractPipeline
+from app.pipeline.transform_pipeline import TransformPipeline
+from app.pipeline.chunk_pipeline import ChunkPipeline
+from app.pipeline.embedding_pipeline import EmbeddingPipeline
+from app.pipeline.index_pipeline import IndexPipeline
 
 
 class PDFService:
 
     def __init__(self):
 
-        self.loader = PDFLoader()
+        self.extract = ExtractPipeline()
+        self.transform = TransformPipeline()
 
-        self.cleaner = TextCleaner()
+        self.chunk = ChunkPipeline()
 
-        self.chunker = TextChunker()
+        self.embedding = EmbeddingPipeline()
 
-        self.embedder = EmbeddingService()
-
-        self.vector_store = VectorStore()
+        self.index = IndexPipeline()
 
 
     def upload(
@@ -26,27 +25,27 @@ class PDFService:
     ):
 
         # 1 Load PDF
-        document = self.loader.load(
+        document = self.extract.run(
             file_path
         )
 
         # 2 Clean
-        cleaned = self.cleaner.clean(
+        cleaned = self.transform.run(
             document
         )
 
         # 3 Chunk
-        chunks = self.chunker.chunk(
+        chunks = self.chunk.run(
             cleaned
         )
 
         # 4 Embedding
-        embeddings = self.embedder.embed(
+        embeddings = self.embedding.run(
             chunks
         )
 
         # 5 Save
-        self.vector_store.add(
+        self.index.run(
             chunks,
             embeddings
         )

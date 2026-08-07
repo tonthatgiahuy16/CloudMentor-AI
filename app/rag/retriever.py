@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 from app.core.logger import logger
-
+from app.core import config
 
 class Retriever:
     """
@@ -13,12 +13,11 @@ class Retriever:
         self.collection = vector_store.collection
 
     def search(
-        self,
-        query_embedding,
-        top_k: int = 5,
-        threshold: float = 1.0
-    ) -> List[Dict[str, Any]]:
-
+    self,
+    query_embedding,
+    top_k=config.TOP_K,
+    threshold=config.SIMILARITY_THRESHOLD
+):
         results = self.collection.query(
             query_embeddings=[
                 query_embedding.tolist()

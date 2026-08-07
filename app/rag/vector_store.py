@@ -1,6 +1,7 @@
 from typing import List
 
 import chromadb
+from app.core import config
 
 from app.models.chunk import Chunk
 from app.core.logger import logger
@@ -14,7 +15,7 @@ class VectorStore:
     ):
 
         self.client = chromadb.PersistentClient(
-            path="./chroma_db"
+            path=str(config.CHROMA_DIR)
         )
 
         self.collection = self.client.get_or_create_collection(
