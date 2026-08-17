@@ -9,9 +9,11 @@ class ChunkPipeline:
 
     def run(
         self,
-        documents
+        documents,
+        document_id: str
     ):
 
-        return self.chunker.chunk(
-            documents
+        return self.chunker.split(
+            documents,
+            document_id
         )

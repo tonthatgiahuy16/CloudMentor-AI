@@ -3,7 +3,7 @@ from app.pipeline.transform_pipeline import TransformPipeline
 from app.pipeline.chunk_pipeline import ChunkPipeline
 from app.pipeline.embedding_pipeline import EmbeddingPipeline
 from app.pipeline.index_pipeline import IndexPipeline
-
+from uuid import uuid4
 
 class PDFService:
 
@@ -21,8 +21,12 @@ class PDFService:
 
     def upload(
         self,
-        file_path: str
-    ):
+        file_path: str,
+        document_id=None
+        ):
+        if document_id is None:
+            document_id = str(uuid4())
+    
 
         # 1 Load PDF
         document = self.extract.run(
@@ -36,7 +40,8 @@ class PDFService:
 
         # 3 Chunk
         chunks = self.chunk.run(
-            cleaned
+            cleaned,
+            document_id
         )
 
         # 4 Embedding

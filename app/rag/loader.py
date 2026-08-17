@@ -5,16 +5,13 @@ from pypdf import PdfReader
 
 from app.core.logger import logger
 from app.models.document import Document
-from app.rag.cleaner import TextCleaner
+
 
 
 class PDFLoader:
     """
     Chịu trách nhiệm đọc PDF và chuyển thành List[Document].
     """
-
-    def __init__(self):
-        self.cleaner = TextCleaner()
 
 
     def load(self, pdf_path: str) -> List[Document]:
@@ -46,14 +43,14 @@ class PDFLoader:
             text = page.extract_text() or ""
 
 
-            text = self.cleaner.clean(text)
+
 
 
             documents.append(
                 Document(
                     page=page_number,
                     source=pdf_file.name,
-                    text=text.strip()
+                    text=text
                 )
             )
 
