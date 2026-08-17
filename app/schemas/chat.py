@@ -6,6 +6,9 @@ class ChatRequest(BaseModel):
 
 
 class SourceResponse(BaseModel):
+    chunk_id: str
+    document_id: str
+    chunk_index: int
     source: str
     page: int
     distance: float

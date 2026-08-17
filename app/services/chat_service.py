@@ -65,6 +65,9 @@ Content:
 
             sources.append(
                 {
+                    "chunk_id": item["chunk_id"],
+                    "document_id": metadata.get("document_id"),
+                    "chunk_index": metadata.get("chunk_index"),
                     "source": metadata.get("source"),
                     "page": metadata.get("page"),
                     "distance": round(item["distance"], 3)

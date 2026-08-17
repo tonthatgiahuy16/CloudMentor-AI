@@ -36,13 +36,12 @@ class PDFService:
 
         # 2 Clean
         cleaned = self.transform.run(
-            document
+            documents
         )
 
         # 3 Chunk
         chunks = self.chunk.run(
-            cleaned,
-            document_id
+            cleaned
         )
 
         # 4 Embedding

@@ -25,26 +25,36 @@ class Retriever:
             n_results=top_k
         )
 
+        ids= results["ids"][0]
         documents = results["documents"][0]
         metadatas = results["metadatas"][0]
         distances = results["distances"][0]
 
         retrieved = []
 
-        for doc, metadata, distance in zip(
+        for chunk_id, doc, metadata, distance in zip(
+            ids,
             documents,
             metadatas,
-            distances
+            distances,
         ):
+            print("chunk_id:", chunk_id)
+            print("distance:", distance)
+            print("metadata:", metadata)
+            print("---")
+
+
+
 
             # Chỉ lấy kết quả đủ liên quan
             if distance <= threshold:
 
                 retrieved.append(
                     {
+                        "chunk_id": chunk_id,
                         "document": doc,
                         "metadata": metadata,
-                        "distance": distance
+                        "distance": distance,
                     }
                 )
 
