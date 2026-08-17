@@ -9,9 +9,13 @@ class ExtractPipeline:
 
     def run(
         self,
-        file_path: str
+        file_path,
+        document_id
     ):
 
         return self.loader.load(
-            file_path
+            file_path,
+            document_id
         )
+        
+        

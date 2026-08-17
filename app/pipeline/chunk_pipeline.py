@@ -10,10 +10,8 @@ class ChunkPipeline:
     def run(
         self,
         documents,
-        document_id: str
     ):
 
         return self.chunker.split(
             documents,
-            document_id
         )

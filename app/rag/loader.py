@@ -14,7 +14,7 @@ class PDFLoader:
     """
 
 
-    def load(self, pdf_path: str) -> List[Document]:
+    def load(self, pdf_path: str, document_id: str) -> List[Document]:
 
         pdf_file = Path(pdf_path)
 
@@ -50,7 +50,8 @@ class PDFLoader:
                 Document(
                     page=page_number,
                     source=pdf_file.name,
-                    text=text
+                    text=text,
+                    document_id=document_id
                 )
             )
 

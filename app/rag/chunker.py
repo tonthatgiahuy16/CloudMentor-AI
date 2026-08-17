@@ -18,7 +18,6 @@ class TextChunker:
     def split(
         self,
         documents: List[Document],
-        document_id: str
     ) -> List[Chunk]:
 
         chunks: List[Chunk] = []
@@ -38,7 +37,7 @@ class TextChunker:
                 chunks.append(
                     Chunk(
                         id=str(uuid.uuid4()),
-                        document_id=document_id,
+                        document_id=document.document_id,
                         chunk_index=len(chunks),
                         page=document.page,
                         source=document.source,

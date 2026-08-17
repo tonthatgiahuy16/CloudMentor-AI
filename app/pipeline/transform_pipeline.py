@@ -10,7 +10,7 @@ class TransformPipeline:
 
     def run(
         self,
-        documents
+        documents,
     ):
 
         cleaned_documents = []
@@ -25,7 +25,8 @@ class TransformPipeline:
                 Document(
                     page=document.page,
                     source=document.source,
-                    text=cleaned_text
+                    text=cleaned_text,
+                    document_id=document.document_id
                 )
             )
 

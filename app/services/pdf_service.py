@@ -29,8 +29,9 @@ class PDFService:
     
 
         # 1 Load PDF
-        document = self.extract.run(
-            file_path
+        documents = self.extract.run(
+            file_path,
+            document_id
         )
 
         # 2 Clean
