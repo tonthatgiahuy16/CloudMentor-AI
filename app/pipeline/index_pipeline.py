@@ -17,3 +17,5 @@ class IndexPipeline:
             chunks,
             embeddings
         )
+
+        return len(chunks)

@@ -39,6 +39,8 @@ class VectorStore:
 
 
 
+
+
         for chunk in chunks:
 
             ids.append(chunk.id)
@@ -57,6 +59,8 @@ class VectorStore:
                 }
             )
 
+    
+
 
         self.collection.add(
             ids=ids,
@@ -69,3 +73,24 @@ class VectorStore:
         logger.info(
             f"Stored {len(chunks)} chunks into vector database"
         )
+
+    def delete_by_document_id(self, document_id: str):
+        results = self.collection.get(
+            where={"document_id": document_id},
+        )
+
+        count = len(results["ids"])
+        if count == 0:
+            return 0
+        self.collection.delete(
+            where={"document_id": document_id}
+        )
+        return count
+        
+
+
+
+
+
+
+    
