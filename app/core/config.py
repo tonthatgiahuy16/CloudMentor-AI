@@ -1,11 +1,21 @@
 from pathlib import Path
-
+import os
+from dotenv import load_dotenv
 # ==========================
 # Project
 # ==========================
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
 
+# ==========================
+# Relational Database
+# ==========================
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured")
 # ==========================
 # Storage
 # ==========================
