@@ -1,12 +1,22 @@
 .env
+.env.*
+!.env.example
 
 .venv/
+venv/
 
 __pycache__/
-
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
 
 chroma_db/
-
-logs/
+storage/
 uploads/
+logs/
+*.log
+
+.idea/
+.vscode/
+.DS_Store
+

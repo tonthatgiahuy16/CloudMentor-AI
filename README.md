@@ -1,230 +1,145 @@
 # CloudMentor AI
 
-![Project Status](https://img.shields.io/badge/status-architecture%20design-2E74B5?style=flat-square)
-![Focus](https://img.shields.io/badge/focus-Data%20Engineering-0E7490?style=flat-square)
-![RAG](https://img.shields.io/badge/RAG-target%20capability-6B7280?style=flat-square)
-![Kafka](https://img.shields.io/badge/Kafka-planned-231F20?style=flat-square&logo=apachekafka&logoColor=white)
-![Spark](https://img.shields.io/badge/Spark-planned-E25A1C?style=flat-square&logo=apachespark&logoColor=white)
-![Machine Learning](https://img.shields.io/badge/ML-planned-7C3AED?style=flat-square)
+> An in-progress RAG API prototype for turning uploaded learning PDFs into traceable, source-grounded answers.
 
-> **CloudMentor AI** is an AI Learning Data Platform that uses **Data Engineering as its backbone** to transform documents and learning behavior into knowledge, analytics, and personalized learning.
+CloudMentor AI is a personal project I am building as a final-year Data Science student. The goal is to learn how document ingestion, backend APIs, relational metadata, vector retrieval, and LLM generation fit together in one maintainable application.
 
-> [!IMPORTANT]
-> This repository currently documents the **final target architecture**. Badges marked `planned` or `target capability` do not mean those components have already been implemented.
+## Current status
 
-## 1. Project Overview
+The repository contains a working application foundation, but it is **not a production system**. The current implementation focuses on the document-ingestion and retrieval path.
 
-CloudMentor AI is designed as an end-to-end learning data platform, not merely a PDF chatbot.
+### Implemented
 
-The platform will:
+- FastAPI endpoints for PDF upload and chat requests.
+- Modular ingestion flow: **Extract -> Transform -> Chunk -> Embed -> Index**.
+- PDF text extraction with page-level metadata.
+- BGE-M3 embeddings and persistent Chroma storage.
+- Retrieval with `document_id`, `chunk_index`, page, source, and distance metadata.
+- Gemini-based answer generation using retrieved context.
+- PostgreSQL models and Alembic migration groundwork for subjects and documents.
+- Manual validation scripts for loading, chunking, embedding, retrieval, and chat behavior.
 
-- Ingest and manage learning documents from multiple formats.
-- Build a searchable knowledge base for source-grounded RAG.
-- Generate and record Quiz interactions and learning history.
-- Process document events and learning events at scale.
-- Produce analytical datasets and Machine Learning features.
-- Detect weak topics and recommend the next learning activity.
+### In progress
 
-Overall value flow:
+- Connecting PostgreSQL lifecycle records to the upload and retrieval services.
+- Replacing manual validation scripts with repeatable pytest tests.
+- Adding safer upload handling, structured error responses, and health checks.
+- Creating a reproducible local environment with Docker Compose.
 
-```text
-Documents -> Data Platform -> Knowledge -> RAG / Quiz
-          -> Learning Events -> Analytics -> Machine Learning
-          -> Personalized Learning
-```
+### Not implemented yet
 
-### Project status
+- Quiz and learning-history features.
+- Kafka event processing.
+- Spark analytics.
+- Machine-learning personalization.
+- Production deployment, CI/CD, and operational monitoring.
 
-| Area | Status |
-|---|---|
-| Product vision and target architecture | Documented |
-| Data Engineering implementation | To be updated from source repository |
-| RAG implementation | To be updated from source repository |
-| Kafka and Spark | Planned phases |
-| Analytics and Machine Learning | Planned phases |
-
-## 2. Architecture Diagram
+## Current architecture
 
 ```mermaid
-flowchart TB
-    U[User] --> FE[Frontend]
-    FE --> API[FastAPI API Layer]
-
-    API --> DU[Document Upload]
-    DU --> FS[(Source File Storage)]
-    DU --> KDE[Kafka: Document Events]
-    KDE --> IC[Ingestion Consumer]
-
-    IC --> EX[Extract]
+flowchart LR
+    U[PDF upload] --> API[FastAPI]
+    API --> EX[Extract]
     EX --> TR[Transform]
-    TR --> CK[Chunk + Metadata]
-    CK --> EM[Embedding]
-    EM --> IX[Index]
+    TR --> CK[Chunk + metadata]
+    CK --> EM[BGE-M3 embeddings]
+    EM --> CH[(Chroma)]
 
-    IX --> PG[(PostgreSQL)]
-    IX --> CH[(Chroma Vector Store)]
+    Q[Question] --> QE[Query embedding]
+    QE --> RT[Retriever]
+    RT --> CH
+    RT --> GM[Gemini]
+    GM --> A[Answer + sources]
 
-    API --> Q[Question]
-    Q --> RT[Retriever]
-    RT <--> CH
-    RT --> GM[Gemini / Answer Generator]
-    GM --> AR[Answer + Sources + Lineage]
-    AR --> API
-
-    API --> QZ[Quiz / Learning Activity]
-    QZ --> PG
-    QZ --> KLE[Kafka: Learning Events]
-
-    KLE --> SP[Spark Batch / Structured Streaming]
-    SP --> AN[Analytics Tables]
-    AN --> FT[Feature Engineering]
-    FT --> ML[ML Training / Inference]
-    ML --> PS[Personalization]
-    PS --> API
+    PG[(PostgreSQL)] -. lifecycle foundation .-> API
 ```
 
-### Main data flows
+The intended boundary is straightforward: PostgreSQL will hold canonical document lifecycle data, while Chroma remains a rebuildable retrieval index.
 
-**Document ingestion**
+## Repository structure
 
 ```text
-Upload -> Store source file -> Publish document event
-       -> Extract -> Transform -> Chunk -> Embed -> Index
-       -> PostgreSQL registry/lifecycle + Chroma vector index
+CloudMentor-AI/
+├── app/
+│   ├── api/              # FastAPI routes
+│   ├── core/             # Configuration, database, and logging
+│   ├── db_models/        # SQLAlchemy models
+│   ├── llm/              # Gemini client and prompts
+│   ├── models/           # Pipeline data models
+│   ├── pipeline/         # Ingestion stages
+│   ├── rag/              # Loader, chunker, embeddings, Chroma, retrieval
+│   └── services/         # Upload and chat orchestration
+├── alembic/              # Database migrations
+├── scripts/              # Manual validation utilities
+├── tests/                # Validation scripts being migrated to pytest
+├── .env.example
+├── alembic.ini
+└── requirements.txt
 ```
 
-**RAG serving**
+## Local setup
 
-```text
-Question -> Query embedding -> Retriever + metadata filters
-         -> Relevant chunks -> Gemini
-         -> Answer + source + page + document_id + chunk_id
+### 1. Create an environment
+
+```bash
+python -m venv .venv
 ```
 
-**Learning analytics and personalization**
+Activate it, then install the dependencies:
 
-```text
-Quiz / User Activity -> PostgreSQL + Kafka
-                     -> Spark Batch / Streaming
-                     -> Analytics -> Features -> ML
-                     -> Recommendation
+```bash
+pip install -r requirements.txt
 ```
 
-The following capabilities apply across all flows:
+### 2. Configure environment variables
 
-- Data Quality
-- Observability
-- Data Lineage
-- Identity and metadata propagation
-- Lifecycle and failure management
+Copy `.env.example` to `.env` and provide your local PostgreSQL connection and Gemini API key.
 
-## 3. Business Value
-
-### Problem
-
-Learning materials are often fragmented across files and platforms. Traditional document search does not explain concepts well, while a standalone RAG chatbot cannot determine whether a learner is improving or which topic should be studied next.
-
-### Solution
-
-CloudMentor AI combines two data domains:
-
-1. **Knowledge data:** subjects, documents, chapters, topics, chunks, and embeddings.
-2. **Learning data:** quizzes, questions, answers, attempts, scores, and user activity.
-
-This combination allows the platform to provide:
-
-- Source-grounded answers that users can verify.
-- Structured practice through Quiz activities.
-- Learning progress and weak-topic analytics.
-- Recommendations based on historical learning behavior.
-
-### Expected outcome
-
-When the complete roadmap is delivered, the system should be able to produce guidance such as:
-
-> You are currently weak in **Chapter 4 — Cloud Security**. Your three latest answers about **IAM** were incorrect. Review **Identity and Access Management**, then continue with the recommended basic Quiz.
-
-The project creates value by turning raw learning content and user activity into measurable learning decisions—not by adding tools for their own sake.
-
-## 4. Engineering Challenges & Solutions
-
-> [!NOTE]
-> At the current architecture stage, these are **design challenges and planned responses**. This section will later be replaced with problems actually encountered, evidence, and measured results from the implementation.
-
-| Engineering challenge | Planned solution | How it will be validated |
-|---|---|---|
-| Large document binaries should not travel through Kafka | Store the source file separately; publish `document_id`, `source_uri`, metadata, and processing context | Event payload inspection and upload/load testing |
-| PostgreSQL lifecycle and Chroma index may become inconsistent | Treat PostgreSQL as the system of record; make Chroma a rebuildable derived index | Failure injection, reconciliation, delete, and rebuild tests |
-| Replayed events may create duplicate business effects | Use stable `event_id`, idempotent consumers, retry policy, and dead-letter handling | Replay the same event and verify one business outcome |
-| Metadata may be lost between pipeline stages | Define stage contracts and propagate `document_id`, `chunk_id`, subject, page, and source | Contract and lineage tests across the complete pipeline |
-| RAG answers may lack reliable evidence | Apply subject filters, retrieval thresholds, grounded prompting, and source serialization | Curated retrieval/answer evaluation set |
-| Machine Learning may be introduced before enough quality data exists | Build Quiz history, analytics, and versioned features before model training | Data readiness checks and baseline comparison |
-| Failures may be difficult to diagnose | Add lifecycle state, structured logs, metrics, correlation IDs, and alerts | Operational dashboards and failure-recovery exercises |
-
-Actual implementation notes should eventually follow this format:
-
-```text
-Problem -> Root cause -> Design decision -> Trade-off
-        -> Implementation -> Measured result -> Remaining limitation
+```env
+DATABASE_URL=postgresql+psycopg://cloudmentor:cloudmentor@localhost:5432/cloudmentor
+GEMINI_API_KEY=replace_with_your_key
+MODEL_NAME=gemini-2.5-flash
 ```
 
-## 5. Tech Stack Rationale
+Never commit the populated `.env` file.
 
-| Technology | Primary role | Why it fits | Boundary / trade-off | Status |
-|---|---|---|---|---|
-| **Python** | Pipeline and application language | Strong ecosystem for Data Engineering, RAG, and ML | Performance-critical workloads may need distributed or compiled components | Target stack |
-| **FastAPI** | Backend API layer | Typed contracts, validation, and async-friendly APIs | API should remain thin; long processing belongs in workers | Target stack |
-| **PostgreSQL** | Relational system of record | Transactions, constraints, joins, and canonical lifecycle state | Not the primary semantic vector-serving layer | Target stack |
-| **Chroma** | Vector serving index | Simple embedding storage, similarity search, and metadata filtering | Derived index; not the source of truth for business data | Target stack |
-| **Kafka** | Event transport and streaming backbone | Decoupling, buffering, replay, partitioning, and consumer scaling | Adds operational complexity; only justified by real async/scale requirements | Planned |
-| **Spark** | Distributed batch/stream processing | Large-scale joins, aggregation, Structured Streaming, and feature engineering | Unnecessary overhead for small single-node workloads | Planned |
-| **Gemini** | Grounded answer generation | Generates natural-language answers from retrieved context | Does not own knowledge, lifecycle, or canonical data | Target capability |
-| **Embedding model** | Semantic representation | Enables document/query similarity search | Requires evaluation and version tracking | Target capability |
-| **Docker Compose** | Reproducible local environment | Simplifies multi-service development and onboarding | Compose configuration must reflect actual implemented services | Planned |
+### 3. Run database migrations
 
-### Core architecture decisions
+```bash
+alembic upgrade head
+```
 
-- **PostgreSQL is the system of record; Chroma is a rebuildable serving index.**
-- **Kafka transports events; it does not replace transactional storage.**
-- **Spark processes data; it does not serve application requests.**
-- **Gemini generates answers; retrieved context supplies the knowledge.**
-- **RAG, Quiz, Analytics, and ML are consumers of the same data platform.**
-- **Kafka, Spark, and ML are added only when latency, volume, complexity, or product value justifies them.**
+### 4. Start the API
 
-## 6. Setup Instructions
+```bash
+uvicorn app.main:app --reload
+```
 
-### Current documentation phase
+Open `http://127.0.0.1:8000/docs` to inspect the API.
 
-This repository does not yet define a verified executable environment. At this stage, use the HTTPS or SSH URL from GitHub's **Code** menu to clone the repository, then review it as an architecture-first project. There is no application startup command yet.
+## Known limitations
 
-Available project documents:
+- The upload endpoint still needs filename sanitization and stronger PDF validation.
+- PostgreSQL lifecycle models are present but are not fully integrated into the service flow.
+- Validation scripts are not yet a reliable automated test suite.
+- The project currently requires local PostgreSQL and a Gemini API key.
+- Retrieval quality has not yet been evaluated against a curated benchmark.
 
-- [Final Target Architecture](outputs/CloudMentor_AI_Final_Target_Architecture.docx)
-- [Project Goals & Final Outcomes](outputs/CloudMentor_AI_Project_Goals_and_Final_Outcomes.docx)
+## Roadmap
 
-### Planned implementation phases
+1. Finish PostgreSQL lifecycle integration.
+2. Add pytest unit and integration tests.
+3. Add Docker Compose and health checks.
+4. Build a small retrieval-evaluation dataset.
+5. Add document deletion and Chroma reconciliation.
+6. Consider Kafka or Spark only when the product workflow justifies them.
 
-- [ ] Phase 1 — Core Data Foundation and RAG
-- [ ] Phase 2 — PostgreSQL System of Record, Reliability, and Multi-source Ingestion
-- [ ] Phase 3 — Quiz and Learning Application
-- [ ] Phase 4 — Event-driven Processing with Kafka
-- [ ] Phase 5 — Distributed Analytics with Spark
-- [ ] Phase 6 — Machine Learning and Personalization
+## Author
 
-### Future local setup
+**Tôn Thất Gia Huy**  
+Final-year Data Science student, expected graduation in 2027.
 
-Once the application source and service definitions are committed, this section will be replaced with verified instructions covering:
+- [Portfolio](https://tonthatgiahuy16.github.io)
+- [GitHub](https://github.com/tonthatgiahuy16)
+- [LinkedIn](https://www.linkedin.com/in/t%C3%B4n-th%E1%BA%A5t-gia-huy-708860369/)
 
-1. Required versions and prerequisites.
-2. Environment variable configuration.
-3. Database and vector-store initialization.
-4. Docker Compose startup.
-5. Migrations and seed data.
-6. Health checks and automated tests.
-7. Sample document ingestion and RAG request.
-
-Commands such as `docker compose up` should only be added after the corresponding Compose file has been committed and tested.
-
----
-
-**CloudMentor AI is built to demonstrate an end-to-end data platform—not another isolated RAG chatbot. Data Engineering is the backbone; RAG, Quiz, Analytics, and Machine Learning are its consumers.**
