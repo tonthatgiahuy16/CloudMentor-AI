@@ -1,6 +1,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+pythonpath = ["."]
 python_files = [
   "test_cleaner.py",
   "test_chunker.py",
@@ -11,3 +12,4 @@ python_files = [
   "test_schemas.py",
   "test_upload_api.py",
 ]
+
