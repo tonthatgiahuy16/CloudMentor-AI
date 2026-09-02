@@ -1,24 +1,15 @@
 import re
 
 
+UNIVERSITY_HEADER = (
+    "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI THÀNH PHỐ HỒ CHÍ MINH"
+)
+
+
 class TextCleaner:
+    def clean(self, text: str) -> str:
+        """Normalize whitespace and remove the repeated university header."""
 
-
-    def clean(self, text:str):
-
-        # Remove multiple spaces
-        text = re.sub(
-            r'\s+',
-            ' ',
-            text
-        )
-
-
-        # Remove university header
-        text = text.replace(
-            "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI THÀNH PHỐ HỒ CHÍ MINH",
-            ""
-        )
-
-
-        return text.strip()
+        normalized = re.sub(r"\s+", " ", text or "")
+        normalized = normalized.replace(UNIVERSITY_HEADER, "")
+        return normalized.strip()

@@ -7,58 +7,29 @@ from app.core.logger import logger
 from app.models.document import Document
 
 
-
 class PDFLoader:
-    """
-    Chịu trách nhiệm đọc PDF và chuyển thành List[Document].
-    """
-
+    """Read a PDF into page-level documents with lineage metadata."""
 
     def load(self, pdf_path: str, document_id: str) -> List[Document]:
-
         pdf_file = Path(pdf_path)
 
         if not pdf_file.exists():
-            raise FileNotFoundError(
-                f"Không tìm thấy file: {pdf_path}"
-            )
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+        if not pdf_file.is_file():
+            raise ValueError(f"PDF path is not a file: {pdf_path}")
+        if pdf_file.suffix.lower() != ".pdf":
+            raise ValueError(f"Expected a PDF file: {pdf_path}")
 
-
-        logger.info(
-            f"Loading PDF: {pdf_file.name}"
-        )
-
-
+        logger.info("Loading PDF: %s", pdf_file.name)
         reader = PdfReader(pdf_file)
-
-
-        documents = []
-
-
-        for page_number, page in enumerate(
-            reader.pages,
-            start=1
-        ):
-
-            text = page.extract_text() or ""
-
-
-
-
-
-            documents.append(
-                Document(
-                    page=page_number,
-                    source=pdf_file.name,
-                    text=text,
-                    document_id=document_id
-                )
+        documents = [
+            Document(
+                document_id=document_id,
+                page=page_number,
+                source=pdf_file.name,
+                text=page.extract_text() or "",
             )
-
-
-        logger.info(
-            f"Loaded {len(documents)} pages from {pdf_file.name}"
-        )
-
-
+            for page_number, page in enumerate(reader.pages, start=1)
+        ]
+        logger.info("Loaded %s pages from %s", len(documents), pdf_file.name)
         return documents

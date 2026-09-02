@@ -1,68 +1,55 @@
-from app.rag.embedder import EmbeddingService
-from app.rag.vector_store import VectorStore
-from app.rag.retriever import Retriever
-
-from app.llm.generator import AnswerGenerator
+from typing import Any
 
 from app.core.logger import logger
 
 
 class ChatService:
+    """Coordinate query embedding, retrieval, and answer generation."""
 
-    def __init__(self):
-
-        self.vector_store = VectorStore()
-
-        self.embedder = EmbeddingService()
-
-        self.retriever = Retriever(
-            self.vector_store
-        )
-
-        self.generator = AnswerGenerator()
-
-    def ask(
+    def __init__(
         self,
-        question: str
-    ) -> dict:
+        *,
+        embedder: Any | None = None,
+        retriever: Any | None = None,
+        generator: Any | None = None,
+    ):
+        if embedder is None or retriever is None or generator is None:
+            from app.llm.generator import AnswerGenerator
+            from app.rag.embedder import EmbeddingService
+            from app.rag.retriever import Retriever
+            from app.rag.vector_store import VectorStore
 
-        question = question.strip()
+            vector_store = VectorStore()
+            embedder = embedder or EmbeddingService()
+            retriever = retriever or Retriever(vector_store)
+            generator = generator or AnswerGenerator()
 
-        logger.info(
-            f"Question: {question}"
-        )
+        self.embedder = embedder
+        self.retriever = retriever
+        self.generator = generator
 
-        # 1. Sinh embedding
-        query_vector = self.embedder.embed_query(
-            question
-        )
+    def ask(self, question: str) -> dict[str, Any]:
+        normalized_question = question.strip()
+        if not normalized_question:
+            raise ValueError("question must not be empty")
 
-        # 2. Retrieve
-        results = self.retriever.search(
-            query_vector,
-            top_k=3
-        )
+        logger.info("Question received")
+        query_vector = self.embedder.embed_query(normalized_question)
+        results = self.retriever.search(query_vector)
 
         contexts = []
         sources = []
-
         for item in results:
-
-            metadata = item["metadata"]
-
+            metadata = item.get("metadata") or {}
             contexts.append(
-                f"""
-Source:
-{metadata.get("source")}
-
-Page:
-{metadata.get("page")}
-
-Content:
-{item["document"]}
-"""
+                "\n".join(
+                    [
+                        f"Source: {metadata.get('source')}",
+                        f"Page: {metadata.get('page')}",
+                        f"Content: {item.get('document', '')}",
+                    ]
+                )
             )
-
             sources.append(
                 {
                     "chunk_id": item["chunk_id"],
@@ -70,27 +57,14 @@ Content:
                     "chunk_index": metadata.get("chunk_index"),
                     "source": metadata.get("source"),
                     "page": metadata.get("page"),
-                    "distance": round(item["distance"], 3)
+                    "distance": round(item["distance"], 3),
                 }
             )
 
-        logger.info(
-            f"Retrieved {len(contexts)} contexts"
-        )
-
-        # 3. Generate answer
-        answer = self.generator.generate(
-            question,
-            contexts
-        )
-
-        logger.info(
-            "Answer generated successfully"
-        )
-
-        # 4. Return
+        logger.info("Retrieved %s contexts", len(contexts))
+        answer = self.generator.generate(normalized_question, contexts)
         return {
-            "question": question,
+            "question": normalized_question,
             "answer": answer,
-            "sources": sources
+            "sources": sources,
         }

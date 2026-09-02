@@ -1,107 +1,104 @@
 # CloudMentor AI
 
+[![Tests](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml/badge.svg)](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml)
+
 > An in-progress document-data backbone for RAG applications, built around modular PDF ingestion, traceable metadata, PostgreSQL lifecycle records, and a rebuildable Chroma index.
 
-CloudMentor AI is a personal project I am building as a final-year Data Science student. It explores how raw learning documents can be converted into structured, traceable data that backend services and LLM-based applications can use reliably.
+CloudMentor AI is a personal project I am building as a final-year Data Science student. It explores how learning documents can be converted into structured, traceable data for backend services and LLM-based applications.
 
-The current focus is the **data backbone**: ingestion stages, metadata propagation, storage boundaries, retrieval, and validation. The LLM is a downstream consumer of this pipeline rather than the center of the architecture.
+The main focus is the **data backbone**: ingestion stages, metadata propagation, storage boundaries, retrieval, validation, and testability. The LLM is a downstream consumer rather than the center of the architecture.
 
 ## What this project demonstrates
 
 - A modular **Extract -> Transform -> Chunk -> Embed -> Index** ingestion flow.
-- Page- and chunk-level metadata carried from the source PDF into retrieval results.
-- A dual-store design in which PostgreSQL represents canonical lifecycle data and Chroma acts as a rebuildable retrieval index.
+- Page- and chunk-level lineage carried from each PDF into retrieval results.
+- PostgreSQL as the planned source of truth for document lifecycle data and Chroma as a derived retrieval index.
 - Clear boundaries between ingestion, persistence, retrieval, API, and generation components.
-- Stage-level validation while the project moves toward repeatable automated tests.
+- Dependency-injected chat orchestration that can be tested without live model services.
+- Automated unit and API tests running in GitHub Actions.
 
 ## Current status
 
-The repository contains a working ingestion and retrieval foundation, but it is **not a production system**. PostgreSQL models and migrations exist; their full integration into the upload and retrieval lifecycle is still in progress.
+The repository contains a working ingestion and retrieval foundation, but it is **not a production system**.
 
 ### Implemented
 
 - FastAPI endpoints for PDF upload and chat requests.
-- PDF text extraction with page-level metadata.
-- Transformation and chunking stages with traceable document metadata.
-- BGE-M3 embeddings and persistent Chroma storage.
-- Retrieval results containing `document_id`, `chunk_index`, page, source, and distance metadata.
+- PDF extraction, text cleaning, overlapping chunking, embeddings, and persistent Chroma indexing.
+- Retrieval results containing `document_id`, `chunk_index`, page, source, and vector distance.
 - Gemini-based answer generation using retrieved context.
 - PostgreSQL models and Alembic migration groundwork for subjects and documents.
-- Manual validation scripts for loading, chunking, embedding, retrieval, and chat behavior.
+- Safer PDF upload handling: extension, MIME type, file signature, filename, and 10 MB size checks.
+- UUID-prefixed server filenames and cleanup when ingestion fails.
+- Input validation for chat questions and chunk configuration.
+- Pytest coverage for cleaning, loading, chunking, transformation, retrieval, chat orchestration, schemas, and upload validation.
+- GitHub Actions checks for Python syntax and tests on pushes and pull requests.
 
 ### In progress
 
 - Connecting PostgreSQL lifecycle records to the upload and retrieval services.
-- Replacing manual validation scripts with repeatable pytest tests.
-- Adding safer upload handling, structured error responses, and health checks.
-- Creating a reproducible local environment with Docker Compose.
+- Integration tests for PostgreSQL, Chroma, embedding, and Gemini boundaries.
+- Document deletion and PostgreSQL-Chroma reconciliation.
+- A reproducible local environment with Docker Compose and health checks.
+- A small retrieval-quality benchmark.
 
-### Not implemented yet
+### Deliberately not claimed
 
-- Quiz and learning-history features.
-- Kafka event processing.
-- Spark analytics.
-- Machine-learning personalization.
-- Production deployment, CI/CD, and operational monitoring.
+- Production deployment or operational monitoring.
+- Kafka or Spark processing without a justified workload.
+- Quiz, learning-history, or ML-personalization features.
 
-## Data Engineering backbone
-
-### 1. Ingestion
-
-The upload API accepts a PDF and passes it through explicit pipeline stages. Each stage has a focused responsibility, making the flow easier to validate and extend.
+## Data flow
 
 ```text
 PDF upload
-   -> Extract text by page
-   -> Transform text
-   -> Create chunks and metadata
-   -> Generate embeddings
-   -> Index vectors for retrieval
+   -> validate and store safely
+   -> extract text by page
+   -> normalize text
+   -> create overlapping chunks + lineage metadata
+   -> generate BGE-M3 embeddings
+   -> index in Chroma
+
+Question
+   -> embed query
+   -> retrieve relevant chunks
+   -> generate answer with Gemini
+   -> return answer + sources
 ```
 
-### 2. Traceability
+## Traceability
 
-Metadata is preserved through ingestion and retrieval so an answer can be traced back to its source. The current retrieval path exposes:
+Every retrieval result keeps enough metadata to trace an answer back to its source:
 
 - `document_id`
 - `chunk_index`
 - page
-- source
+- source filename
 - vector distance
 
-This provides the foundation for source-grounded answers, document-level filtering, deletion, and later quality evaluation.
+This is the foundation for source-grounded answers, document-level filtering, deletion, and later retrieval evaluation.
 
-### 3. Storage boundaries
-
-The two storage systems serve different purposes:
+## Storage boundaries
 
 | Store | Responsibility | Current state |
 | --- | --- | --- |
-| PostgreSQL | Canonical subject and document lifecycle records | Models and Alembic migrations implemented; service integration in progress |
-| Chroma | Persistent embeddings and retrieval metadata | Implemented in the current ingestion and retrieval path |
+| PostgreSQL | Canonical subject and document lifecycle records | Models and Alembic migrations exist; service integration is in progress |
+| Chroma | Persistent embeddings and retrieval metadata | Used by the current ingestion and retrieval path |
 
-PostgreSQL is intended to remain the source of truth for document lifecycle data. Chroma is treated as a derived index that can be reconciled or rebuilt from canonical records.
+The intended design treats Chroma as a rebuildable index, not the canonical record of uploaded documents.
 
-### 4. Serving and consumption
-
-FastAPI exposes the pipeline to clients. For a chat request, the system embeds the question, retrieves relevant chunks and passes only the retrieved context to Gemini. The response includes source information from the retrieval layer.
-
-### 5. Reliability work
-
-The project currently uses manual scripts to validate individual stages. The next reliability milestones are automated tests, safer upload handling, document deletion, and reconciliation between PostgreSQL and Chroma.
-
-## Current architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-    U[PDF upload] --> API[FastAPI upload service]
-    API --> EX[Extract by page]
-    EX --> TR[Transform text]
-    TR --> CK[Chunk + metadata]
+    U[PDF upload] --> V[Validation]
+    V --> EX[Extract by page]
+    EX --> TR[Normalize text]
+    TR --> CK[Chunk + lineage]
     CK --> EM[BGE-M3 embeddings]
     EM --> CH[(Chroma index)]
 
-    API -. lifecycle integration in progress .-> PG[(PostgreSQL)]
+    V -. lifecycle integration in progress .-> PG[(PostgreSQL)]
 
     Q[Question] --> QE[Query embedding]
     QE --> RT[Retriever]
@@ -114,40 +111,33 @@ flowchart LR
 
 ```text
 CloudMentor-AI/
+├── .github/workflows/   # CI test workflow
 ├── app/
-│   ├── api/              # FastAPI routes
-│   ├── core/             # Configuration, database, and logging
-│   ├── db_models/        # SQLAlchemy models
-│   ├── llm/              # Gemini client and prompts
-│   ├── models/           # Pipeline data models
-│   ├── pipeline/         # Ingestion stages
-│   ├── rag/              # Loader, chunker, embeddings, Chroma, retrieval
-│   └── services/         # Upload and chat orchestration
-├── alembic/              # Database migrations
-├── scripts/              # Manual validation utilities
-├── tests/                # Validation scripts being migrated to pytest
-├── .env.example
-├── alembic.ini
-└── requirements.txt
+│   ├── api/             # FastAPI routes and request validation
+│   ├── core/            # Configuration, database, and logging
+│   ├── db_models/       # SQLAlchemy models
+│   ├── llm/             # Gemini client and prompts
+│   ├── models/          # Pipeline data models
+│   ├── pipeline/        # Ingestion stages
+│   ├── rag/             # Loader, chunker, embeddings, index, retrieval
+│   └── services/        # Upload and chat orchestration
+├── alembic/             # Database migrations
+├── scripts/             # Manual service probes
+├── tests/               # Isolated pytest unit and API tests
+├── requirements.txt
+└── requirements-test.txt
 ```
 
 ## Local setup
 
-### 1. Create an environment
+Create and activate a virtual environment, then install the application dependencies:
 
 ```bash
 python -m venv .venv
-```
-
-Activate it, then install the dependencies:
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment variables
-
-Copy `.env.example` to `.env` and provide your local PostgreSQL connection and Gemini API key.
+Copy `.env.example` to `.env` and set local values:
 
 ```env
 DATABASE_URL=postgresql+psycopg://cloudmentor:cloudmentor@localhost:5432/cloudmentor
@@ -155,40 +145,42 @@ GEMINI_API_KEY=replace_with_your_key
 MODEL_NAME=gemini-2.5-flash
 ```
 
-Never commit the populated `.env` file.
-
-### 3. Run database migrations
+Run migrations and start the API:
 
 ```bash
 alembic upgrade head
-```
-
-### 4. Start the API
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` to inspect the API.
+Open `http://127.0.0.1:8000/docs` for the API documentation.
+
+## Tests
+
+The automated suite is isolated from live PostgreSQL, Chroma, embedding-model, and Gemini services.
+
+```bash
+pip install -r requirements-test.txt
+pytest -q
+```
+
+The same checks run in GitHub Actions. Live-service integration and retrieval-quality evaluation remain separate milestones.
 
 ## Known limitations
 
-- PostgreSQL lifecycle models are not yet fully connected to the service flow.
-- The upload endpoint still needs filename sanitization and stronger PDF validation.
-- Validation scripts are not yet a reliable automated test suite.
-- The project currently requires local PostgreSQL and a Gemini API key.
-- Retrieval quality has not yet been evaluated against a curated benchmark.
-- Chroma reconciliation and document deletion are not yet implemented.
+- PostgreSQL lifecycle models are not fully connected to the service flow.
+- There is no transaction or compensation strategy across PostgreSQL and Chroma yet.
+- Live Chroma, embedding, Gemini, and PostgreSQL integration is not covered by CI.
+- Retrieval quality has not been measured against a curated benchmark.
+- Docker Compose, health checks, deployment, and monitoring are not implemented.
 
 ## Roadmap
 
 1. Finish PostgreSQL lifecycle integration.
 2. Add idempotent ingestion and document-level duplicate detection.
-3. Add document deletion and PostgreSQL-Chroma reconciliation.
-4. Add pytest unit and integration tests.
+3. Add deletion and PostgreSQL-Chroma reconciliation.
+4. Add live-service integration tests.
 5. Add Docker Compose and health checks.
-6. Build a small retrieval-evaluation dataset.
-7. Consider Kafka or Spark only when the workflow has a justified event-processing or analytics requirement.
+6. Build a retrieval-evaluation dataset and track grounding quality.
 
 ## Author
 
@@ -198,4 +190,3 @@ Final-year Data Science student, expected graduation in 2027.
 - [Portfolio](https://tonthatgiahuy16.github.io)
 - [GitHub](https://github.com/tonthatgiahuy16)
 - [LinkedIn](https://www.linkedin.com/in/t%C3%B4n-th%E1%BA%A5t-gia-huy-708860369/)
-

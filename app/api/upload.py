@@ -1,42 +1,74 @@
+import os
+from functools import lru_cache
 from pathlib import Path
-import shutil
+from uuid import uuid4
 
-from fastapi import APIRouter
-from fastapi import UploadFile
-from fastapi import File
-
-from app.services.pdf_service import PDFService
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 
-router = APIRouter(
-    prefix="/upload",
-    tags=["Upload"]
-)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf"}
 
-pdf_service = PDFService()
-
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
-@router.post("/")
-def upload_pdf(
-    file: UploadFile = File(...)
+@lru_cache
+def get_pdf_service():
+    from app.services.pdf_service import PDFService
+
+    return PDFService()
+
+
+def get_upload_dir() -> Path:
+    return Path(os.getenv("CLOUDMENTOR_UPLOAD_DIR", "storage/uploads"))
+
+
+def validate_pdf_upload(
+    filename: str | None,
+    content_type: str | None,
+    data: bytes,
+) -> str:
+    original_name = (filename or "").strip()
+    if not original_name:
+        raise HTTPException(status_code=400, detail="A filename is required")
+    if Path(original_name).name != original_name or "\\" in original_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if Path(original_name).suffix.lower() != ".pdf":
+        raise HTTPException(status_code=415, detail="Only PDF files are supported")
+    if content_type not in PDF_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Invalid PDF content type")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds the 10 MB limit")
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(status_code=415, detail="File content is not a PDF")
+    return original_name
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def upload_pdf(
+    file: UploadFile = File(...),
+    pdf_service=Depends(get_pdf_service),
+    upload_dir: Path = Depends(get_upload_dir),
 ):
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    original_name = validate_pdf_upload(file.filename, file.content_type, data)
 
-    save_path = UPLOAD_DIR / file.filename
+    document_id = str(uuid4())
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    save_path = upload_dir / f"{document_id}_{original_name}"
+    save_path.write_bytes(data)
 
-    with open(save_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
+    try:
+        total_chunks = pdf_service.upload(
+            str(save_path),
+            document_id=document_id,
         )
-
-    total_chunks = pdf_service.upload(
-        str(save_path)
-    )
+    except Exception as exc:
+        save_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="PDF processing failed") from exc
 
     return {
-        "message": "Upload thành công",
-        "chunks": total_chunks
+        "document_id": document_id,
+        "filename": original_name,
+        "chunks": total_chunks,
     }

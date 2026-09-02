@@ -1,65 +1,58 @@
-from typing import List, Dict, Any
+from typing import Any
 
-from app.core.logger import logger
 from app.core import config
+from app.core.logger import logger
+
 
 class Retriever:
-    """
-    Thực hiện truy vấn Vector Database và trả về
-    dữ liệu đã được chuẩn hóa.
-    """
+    """Query a vector collection and normalize traceable retrieval results."""
 
-    def __init__(self, vector_store):
+    def __init__(self, vector_store: Any):
         self.collection = vector_store.collection
 
     def search(
-    self,
-    query_embedding,
-    top_k=config.TOP_K,
-    threshold=config.SIMILARITY_THRESHOLD
-):
-        results = self.collection.query(
-            query_embeddings=[
-                query_embedding.tolist()
-            ],
-            n_results=top_k
-        )
+        self,
+        query_embedding: Any,
+        top_k: int = config.TOP_K,
+        threshold: float = config.SIMILARITY_THRESHOLD,
+    ) -> list[dict[str, Any]]:
+        if top_k <= 0:
+            raise ValueError("top_k must be greater than zero")
 
-        ids= results["ids"][0]
-        documents = results["documents"][0]
-        metadatas = results["metadatas"][0]
-        distances = results["distances"][0]
+        embedding = (
+            query_embedding.tolist()
+            if hasattr(query_embedding, "tolist")
+            else list(query_embedding)
+        )
+        results = self.collection.query(
+            query_embeddings=[embedding],
+            n_results=top_k,
+        )
+        groups = (
+            results.get("ids", []),
+            results.get("documents", []),
+            results.get("metadatas", []),
+            results.get("distances", []),
+        )
+        if not all(groups) or not all(group[0] for group in groups):
+            return []
 
         retrieved = []
-
-        for chunk_id, doc, metadata, distance in zip(
-            ids,
-            documents,
-            metadatas,
-            distances,
+        for chunk_id, document, metadata, distance in zip(
+            results["ids"][0],
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
         ):
-            print("chunk_id:", chunk_id)
-            print("distance:", distance)
-            print("metadata:", metadata)
-            print("---")
-
-
-
-
-            # Chỉ lấy kết quả đủ liên quan
             if distance <= threshold:
-
                 retrieved.append(
                     {
                         "chunk_id": chunk_id,
-                        "document": doc,
+                        "document": document,
                         "metadata": metadata,
                         "distance": distance,
                     }
                 )
 
-        logger.info(
-            f"Retrieved {len(retrieved)} documents"
-        )
-
+        logger.info("Retrieved %s documents", len(retrieved))
         return retrieved
