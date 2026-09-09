@@ -12,7 +12,7 @@ The main focus is the **data backbone**: ingestion stages, metadata propagation,
 
 - A modular **Extract -> Transform -> Chunk -> Embed -> Index** ingestion flow.
 - Page- and chunk-level lineage carried from each PDF into retrieval results.
-- PostgreSQL as the planned source of truth for document lifecycle data and Chroma as a derived retrieval index.
+- PostgreSQL lifecycle records connected to ingestion, with Chroma kept as a derived retrieval index linked by `document_id`.
 - Clear boundaries between ingestion, persistence, retrieval, API, and generation components.
 - Dependency-injected chat orchestration that can be tested without live model services.
 - Automated unit and API tests running in GitHub Actions.
@@ -21,13 +21,15 @@ The main focus is the **data backbone**: ingestion stages, metadata propagation,
 
 The repository contains a working ingestion and retrieval foundation, but it is **not a production system**.
 
+A live local run exercised the ingest-to-retrieve path with PostgreSQL, BGE-M3, and Chroma. The document reached `INDEXED` in PostgreSQL, 177 Chroma chunks shared its `document_id`, and a local query returned traceable retrieval results from the indexed data.
+
 ### Implemented
 
 - FastAPI endpoints for PDF upload and chat requests.
 - PDF extraction, text cleaning, overlapping chunking, embeddings, and persistent Chroma indexing.
 - Retrieval results containing `document_id`, `chunk_index`, page, source, and vector distance.
 - Gemini-based answer generation using retrieved context.
-- PostgreSQL models and Alembic migration groundwork for subjects and documents.
+- PostgreSQL-backed upload lifecycle transitions from `UPLOADED` to `PROCESSING` and `INDEXED`, with failure stage and error details recorded as `FAILED`.
 - Safer PDF upload handling: extension, MIME type, file signature, filename, and 10 MB size checks.
 - UUID-prefixed server filenames and cleanup when ingestion fails.
 - Input validation for chat questions and chunk configuration.
@@ -36,7 +38,7 @@ The repository contains a working ingestion and retrieval foundation, but it is 
 
 ### In progress
 
-- Connecting PostgreSQL lifecycle records to the upload and retrieval services.
+- Using PostgreSQL lifecycle records for retrieval filtering and document deletion.
 - Integration tests for PostgreSQL, Chroma, embedding, and Gemini boundaries.
 - Document deletion and PostgreSQL-Chroma reconciliation.
 - A reproducible local environment with Docker Compose and health checks.
@@ -53,11 +55,17 @@ The repository contains a working ingestion and retrieval foundation, but it is 
 ```text
 PDF upload
    -> validate and store safely
+   -> create PostgreSQL document record
+   -> mark PROCESSING
    -> extract text by page
    -> normalize text
    -> create overlapping chunks + lineage metadata
    -> generate BGE-M3 embeddings
    -> index in Chroma
+   -> mark INDEXED
+
+Pipeline failure
+   -> record FAILED status, stage, and error in PostgreSQL
 
 Question
    -> embed query
@@ -82,7 +90,7 @@ This is the foundation for source-grounded answers, document-level filtering, de
 
 | Store | Responsibility | Current state |
 | --- | --- | --- |
-| PostgreSQL | Canonical subject and document lifecycle records | Models and Alembic migrations exist; service integration is in progress |
+| PostgreSQL | Canonical subject and document lifecycle records | Connected to upload ingestion for `UPLOADED`, `PROCESSING`, `INDEXED`, and `FAILED` states |
 | Chroma | Persistent embeddings and retrieval metadata | Used by the current ingestion and retrieval path |
 
 The intended design treats Chroma as a rebuildable index, not the canonical record of uploaded documents.
@@ -92,13 +100,13 @@ The intended design treats Chroma as a rebuildable index, not the canonical reco
 ```mermaid
 flowchart LR
     U[PDF upload] --> V[Validation]
+    V -->|UPLOADED → PROCESSING| PG[(PostgreSQL lifecycle)]
     V --> EX[Extract by page]
     EX --> TR[Normalize text]
     TR --> CK[Chunk + lineage]
     CK --> EM[BGE-M3 embeddings]
     EM --> CH[(Chroma index)]
-
-    V -. lifecycle integration in progress .-> PG[(PostgreSQL)]
+    CH -->|INDEXED| PG
 
     Q[Question] --> QE[Query embedding]
     QE --> RT[Retriever]
@@ -163,11 +171,11 @@ pip install -r requirements-test.txt
 pytest -q
 ```
 
-The same checks run in GitHub Actions. Live-service integration and retrieval-quality evaluation remain separate milestones.
+The same checks run in GitHub Actions. A manual local smoke run has exercised PostgreSQL, BGE-M3, Chroma, and retrieval together; repeatable automated integration coverage and retrieval-quality evaluation remain separate milestones.
 
 ## Known limitations
 
-- PostgreSQL lifecycle models are not fully connected to the service flow.
+- PostgreSQL lifecycle state is connected to ingestion, but retrieval filtering and deletion do not use it yet.
 - There is no transaction or compensation strategy across PostgreSQL and Chroma yet.
 - Live Chroma, embedding, Gemini, and PostgreSQL integration is not covered by CI.
 - Retrieval quality has not been measured against a curated benchmark.
@@ -175,7 +183,7 @@ The same checks run in GitHub Actions. Live-service integration and retrieval-qu
 
 ## Roadmap
 
-1. Finish PostgreSQL lifecycle integration.
+1. Use PostgreSQL lifecycle records for retrieval filtering and deletion.
 2. Add idempotent ingestion and document-level duplicate detection.
 3. Add deletion and PostgreSQL-Chroma reconciliation.
 4. Add live-service integration tests.
