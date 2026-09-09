@@ -14,7 +14,6 @@ from fastapi import (
 
 from app.core.database import SessionLocal
 from app.repos.document_repository import DocumentRepository
-from app.services.pdf_service import PDFService
 
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -32,6 +31,8 @@ router = APIRouter(
 
 
 def get_pdf_service():
+    from app.services.pdf_service import PDFService
+
     db = SessionLocal()
 
     try:
