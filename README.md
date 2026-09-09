@@ -11,7 +11,7 @@ The main focus is the **data backbone**: ingestion stages, metadata propagation,
 ## What this project demonstrates
 
 - A modular **Extract -> Transform -> Chunk -> Embed -> Index** ingestion flow.
-- Page- and chunk-level lineage carried from each PDF into retrieval results.
+- The current ingestion path carries page- and chunk-level lineage from each PDF into retrieval results.
 - PostgreSQL lifecycle records connected to ingestion, with Chroma kept as a derived retrieval index linked by `document_id`.
 - Clear boundaries between ingestion, persistence, retrieval, API, and generation components.
 - Dependency-injected chat orchestration that can be tested without live model services.
@@ -21,13 +21,13 @@ The main focus is the **data backbone**: ingestion stages, metadata propagation,
 
 The repository contains a working ingestion and retrieval foundation, but it is **not a production system**.
 
-A live local run exercised the ingest-to-retrieve path with PostgreSQL, BGE-M3, and Chroma. The document reached `INDEXED` in PostgreSQL, 177 Chroma chunks shared its `document_id`, and a local query returned traceable retrieval results from the indexed data.
+A live local run exercised the ingest-to-retrieve path with PostgreSQL, BGE-M3, and Chroma. The document reached `INDEXED` in PostgreSQL, 177 Chroma chunks shared its `document_id`. A separate local query returned three results across two stored documents.
 
 ### Implemented
 
 - FastAPI endpoints for PDF upload and chat requests.
 - PDF extraction, text cleaning, overlapping chunking, embeddings, and persistent Chroma indexing.
-- Retrieval results containing `document_id`, `chunk_index`, page, source, and vector distance.
+- Retrieval results from the current ingestion path contain `document_id`, `chunk_index`, page, source, and vector distance.
 - Gemini-based answer generation using retrieved context.
 - PostgreSQL-backed upload lifecycle transitions from `UPLOADED` to `PROCESSING` and `INDEXED`, with failure stage and error details recorded as `FAILED`.
 - Safer PDF upload handling: extension, MIME type, file signature, filename, and 10 MB size checks.
@@ -76,7 +76,7 @@ Question
 
 ## Traceability
 
-Every retrieval result keeps enough metadata to trace an answer back to its source:
+For documents processed through the current ingestion path, retrieval results keep enough metadata to trace an answer back to its source:
 
 - `document_id`
 - `chunk_index`
@@ -175,7 +175,7 @@ The same checks run in GitHub Actions. A manual local smoke run has exercised Po
 
 ## Known limitations
 
-- PostgreSQL lifecycle state is connected to ingestion, but retrieval filtering and deletion do not use it yet.
+- PostgreSQL lifecycle state is connected to ingestion, but retrieval filtering and deletion do not use it yet; legacy indexes created before lifecycle integration may lack `document_id` and need re-ingestion or reconciliation.
 - There is no transaction or compensation strategy across PostgreSQL and Chroma yet.
 - Live Chroma, embedding, Gemini, and PostgreSQL integration is not covered by CI.
 - Retrieval quality has not been measured against a curated benchmark.
