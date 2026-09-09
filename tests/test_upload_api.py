@@ -10,8 +10,8 @@ class FakePDFService:
     def __init__(self):
         self.calls = []
 
-    def upload(self, path, *, document_id):
-        self.calls.append((Path(path), document_id))
+    def upload(self, path, *, subject_id, chapter, document_id):
+        self.calls.append((Path(path), subject_id, chapter, document_id))
         return 7
 
 
@@ -30,13 +30,16 @@ def test_upload_accepts_pdf_and_uses_safe_server_filename(tmp_path):
     response = client.post(
         "/upload/",
         files={"file": ("lesson.pdf", b"%PDF-1.4\ncontent", "application/pdf")},
+        data={"subject_id": "7d13e6d0-ef38-4bf2-a5cf-a593517087e4", "chapter": "3"},
     )
 
     assert response.status_code == 201
     payload = response.json()
     assert payload["filename"] == "lesson.pdf"
     assert payload["chunks"] == 7
-    saved_path, document_id = service.calls[0]
+    saved_path, subject_id, chapter, document_id = service.calls[0]
+    assert subject_id == "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+    assert chapter == 3
     assert saved_path.name == f"{document_id}_lesson.pdf"
     assert saved_path.read_bytes().startswith(b"%PDF-")
 
@@ -47,6 +50,7 @@ def test_upload_rejects_fake_pdf_content(tmp_path):
     response = client.post(
         "/upload/",
         files={"file": ("lesson.pdf", b"not a pdf", "application/pdf")},
+        data={"subject_id": "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"},
     )
 
     assert response.status_code == 415
@@ -59,6 +63,7 @@ def test_upload_rejects_wrong_extension(tmp_path):
     response = client.post(
         "/upload/",
         files={"file": ("lesson.txt", b"%PDF-1.4", "application/pdf")},
+        data={"subject_id": "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"},
     )
 
     assert response.status_code == 415

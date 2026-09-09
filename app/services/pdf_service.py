@@ -83,4 +83,4 @@ class PDFService:
                 document_id=document_id,
                 failed_stage=stage,
                 error_message=str(exc))
-raise
+            raise
