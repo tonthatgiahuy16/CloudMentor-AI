@@ -8,6 +8,34 @@ class DocumentRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def get_by_id(self, document_id: str) -> Document | None:
+        return (
+            self.db.query(Document)
+            .filter(Document.document_id == document_id)
+            .first()
+        )
+
+    def mark_deleted(
+        self,
+        document_id: str,
+    ) -> Document:
+        document = self.get_by_id(document_id)
+
+        if document is None:
+            raise RuntimeError("Document not found")
+
+        if document.status == "DELETED":
+            return document
+
+        document.status = "DELETED"
+        document.deleted_at = func.now()
+
+        self.db.commit()
+        self.db.refresh(document)
+
+        return document
+
+
     def mark_processing(self, document_id: str):
         document = (
             self.db.query(Document)

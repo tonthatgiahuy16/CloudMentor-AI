@@ -10,6 +10,6 @@ python_files = [
   "test_retriever.py",
   "test_chat_service.py",
   "test_schemas.py",
+  "test_document_repository.py",
   "test_upload_api.py",
 ]
-
