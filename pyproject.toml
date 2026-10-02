@@ -13,4 +13,5 @@ python_files = [
   "test_document_repository.py",
   "test_upload_api.py",
   "test_document_deletion_service.py",
+  "test_document_deletion_api.py",
 ]
