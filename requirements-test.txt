@@ -6,3 +6,4 @@ pydantic>=2.10,<3.0
 SQLAlchemy>=2.0,<3.0
 pypdf>=5.0,<7.0
 python-dotenv>=1.0,<2.0
+chromadb>=1.0,<2.0
