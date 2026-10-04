@@ -21,3 +21,15 @@ export interface DeleteDocumentResult {
   status: 'DELETED'
   deleted_chunks: number
 }
+
+export interface UploadDocumentInput {
+  file: File
+  subjectId: string
+  chapter: number | null
+}
+
+export interface UploadDocumentResult {
+  document_id: string
+  filename: string
+  chunks: number
+}

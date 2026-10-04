@@ -25,12 +25,13 @@ class PDFService:
         subject_id: str,
         chapter: int | None = None,
         document_id: str | None = None,
+        original_filename: str | None = None,
         ):
         if document_id is None:
             document_id = str(uuid4())
 
         path = Path(file_path)
-        filename = path.name
+        filename = original_filename or path.name
         file_type = path.suffix.lstrip(".").lower()
 
         self.document_repo.create(
