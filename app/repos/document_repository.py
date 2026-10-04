@@ -15,6 +15,14 @@ class DocumentRepository:
             .first()
         )
 
+    def list_active(self) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .filter(Document.status != "DELETED")
+            .order_by(Document.uploaded_at.desc())
+            .all()
+        )
+
     def mark_deleted(
         self,
         document_id: str,

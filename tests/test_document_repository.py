@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
+from types import SimpleNamespace
 from app.core.database import Base
 from app.db_models.subject import Subject
 from app.repos.document_repository import DocumentRepository
@@ -121,3 +121,26 @@ def test_mark_deleted_raises_when_document_missing(
         repository.mark_deleted(
             str(uuid4())
         )
+
+def test_list_active_excludes_deleted_documents(
+    repository,
+    document,
+):
+    active_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="chapter-2.pdf",
+        file_type="pdf",
+        chapter=2,
+    )
+
+    repository.mark_deleted(
+        document.document_id
+    )
+
+    results = repository.list_active()
+
+    assert {
+        result.document_id
+        for result in results
+    } == {active_document.document_id}
