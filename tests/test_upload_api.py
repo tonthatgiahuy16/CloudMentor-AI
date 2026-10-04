@@ -10,8 +10,8 @@ class FakePDFService:
     def __init__(self):
         self.calls = []
 
-    def upload(self, path, *, subject_id, chapter, document_id):
-        self.calls.append((Path(path), subject_id, chapter, document_id))
+    def upload(self, path, *, subject_id, chapter, document_id, original_filename):
+        self.calls.append((Path(path), subject_id, chapter, document_id, original_filename))
         return 7
 
 
@@ -37,9 +37,16 @@ def test_upload_accepts_pdf_and_uses_safe_server_filename(tmp_path):
     payload = response.json()
     assert payload["filename"] == "lesson.pdf"
     assert payload["chunks"] == 7
-    saved_path, subject_id, chapter, document_id = service.calls[0]
+    (
+        saved_path,
+        subject_id,
+        chapter,
+        document_id,
+        original_filename,
+    ) = service.calls[0]
     assert subject_id == "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
     assert chapter == 3
+    assert original_filename == "lesson.pdf"
     assert saved_path.name == f"{document_id}_lesson.pdf"
     assert saved_path.read_bytes().startswith(b"%PDF-")
 

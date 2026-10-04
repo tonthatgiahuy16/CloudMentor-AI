@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+import UploadPanel from './components/UploadPanel'
+
 import {
   deleteDocument,
   getDocuments,
@@ -155,6 +157,7 @@ function App() {
             {isLoading ? 'Đang tải...' : 'Tải lại'}
           </button>
         </header>
+        <UploadPanel onUploaded={refreshDocuments} />
 
         <section className="summary-grid" aria-label="Tổng quan">
           <article className="summary-card">

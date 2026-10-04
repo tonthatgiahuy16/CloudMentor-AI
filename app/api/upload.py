@@ -140,6 +140,7 @@ async def upload_pdf(
             subject_id=subject_id,
             chapter=chapter,
             document_id=document_id,
+            original_filename=original_name,
         )
 
     except Exception as exc:
