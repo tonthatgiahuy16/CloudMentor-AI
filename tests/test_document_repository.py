@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from types import SimpleNamespace
+
 from app.core.database import Base
 from app.db_models.subject import Subject
 from app.repos.document_repository import DocumentRepository
