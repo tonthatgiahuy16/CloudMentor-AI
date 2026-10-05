@@ -18,7 +18,6 @@ Question:
 Yêu cầu:
 - Trả lời tiếng Việt.
 - Dùng Markdown.
-- Cuối câu trả lời ghi:
-  Source:
-  Page:
+- Không tự tạo Source hoặc Page.
+- Hệ thống sẽ hiển thị nguồn trích dẫn riêng.
 """
