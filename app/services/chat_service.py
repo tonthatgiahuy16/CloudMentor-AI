@@ -37,10 +37,36 @@ class ChatService:
         query_vector = self.embedder.embed_query(normalized_question)
         results = self.retriever.search(query_vector)
 
+        if not results:
+            logger.info(
+                "No relevant context found"
+            )
+
+            return {
+                "question": normalized_question,
+                "answer": (
+                    "Tôi không tìm thấy thông tin "
+                    "trong tài liệu."
+                ),
+                "sources": [],
+            }
+
         contexts = []
         sources = []
         for item in results:
             metadata = item.get("metadata") or {}
+
+            document_id = metadata.get(
+                "document_id"
+            )
+
+            if not document_id:
+                logger.warning(
+                    "Skipping chunk without document lineage: %s",
+                    item.get("chunk_id"),
+                )
+                continue
+
             contexts.append(
                 "\n".join(
                     [
@@ -53,13 +79,23 @@ class ChatService:
             sources.append(
                 {
                     "chunk_id": item["chunk_id"],
-                    "document_id": metadata.get("document_id"),
+                    "document_id": document_id,
                     "chunk_index": metadata.get("chunk_index"),
                     "source": metadata.get("source"),
                     "page": metadata.get("page"),
                     "distance": round(item["distance"], 3),
                 }
             )
+
+        if not contexts:
+            return {
+                "question": normalized_question,
+                "answer": (
+                    "Tôi không tìm thấy thông tin "
+                    "trong tài liệu."
+                ),
+                "sources": [],
+            }
 
         logger.info("Retrieved %s contexts", len(contexts))
         answer = self.generator.generate(normalized_question, contexts)

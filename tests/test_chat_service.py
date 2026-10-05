@@ -58,3 +58,75 @@ def test_chat_service_rejects_blank_question():
 
     with pytest.raises(ValueError):
         service.ask("   ")
+
+
+class EmptyRetriever:
+    def search(self, vector):
+        assert vector == [0.1, 0.2]
+        return []
+
+
+class GeneratorMustNotBeCalled:
+    def generate(self, question, contexts):
+        raise AssertionError(
+            "Generator must not be called without context"
+        )
+
+
+def test_chat_service_does_not_generate_without_context():
+    service = ChatService(
+        embedder=FakeEmbedder(),
+        retriever=EmptyRetriever(),
+        generator=GeneratorMustNotBeCalled(),
+    )
+
+    result = service.ask(
+        "What is cloud computing?"
+    )
+
+    assert result == {
+        "question": "What is cloud computing?",
+        "answer": (
+            "Tôi không tìm thấy thông tin "
+            "trong tài liệu."
+        ),
+        "sources": [],
+    }
+
+class RetrieverWithMissingLineage:
+    def search(self, vector):
+        assert vector == [0.1, 0.2]
+
+        return [
+            {
+                "chunk_id": "legacy-chunk",
+                "document": "Legacy document content.",
+                "metadata": {
+                    "chunk_index": 0,
+                    "source": "legacy.pdf",
+                    "page": 1,
+                },
+                "distance": 0.2,
+            }
+        ]
+
+
+def test_chat_service_ignores_chunks_without_lineage():
+    service = ChatService(
+        embedder=FakeEmbedder(),
+        retriever=RetrieverWithMissingLineage(),
+        generator=GeneratorMustNotBeCalled(),
+    )
+
+    result = service.ask(
+        "What is cloud computing?"
+    )
+
+    assert result == {
+        "question": "What is cloud computing?",
+        "answer": (
+            "Tôi không tìm thấy thông tin "
+            "trong tài liệu."
+        ),
+        "sources": [],
+    }

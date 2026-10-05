@@ -2,17 +2,20 @@ from fastapi import APIRouter, Depends
 
 from app.schemas.chat import ChatRequest, ChatResponse
 
+from functools import lru_cache
+
 
 router = APIRouter(
     prefix="/chat",
     tags=["Chat"],
 )
 
-
+@lru_cache
 def get_chat_service():
     from app.services.chat_service import ChatService
 
     return ChatService()
+
 
 
 @router.post(
