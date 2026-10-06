@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import ChatPanel from './components/ChatPanel'
 import UploadPanel from './components/UploadPanel'
 
 import {
@@ -28,6 +29,9 @@ function formatDate(value: string): string {
 }
 
 function App() {
+  const [activePage, setActivePage] = useState<'documents' | 'chat'>(
+    'documents',
+  )
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -129,16 +133,30 @@ function App() {
         </div>
 
         <nav aria-label="Điều hướng chính">
-          <a className="nav-item active" href="#documents">
+          <button
+            className={`nav-item ${activePage === 'documents' ? 'active' : ''}`}
+            type="button"
+            aria-current={activePage === 'documents' ? 'page' : undefined}
+            onClick={() => setActivePage('documents')}
+          >
             Tài liệu
-          </a>
-          <span className="nav-item disabled">Trò chuyện</span>
+          </button>
+          <button
+            className={`nav-item ${activePage === 'chat' ? 'active' : ''}`}
+            type="button"
+            aria-current={activePage === 'chat' ? 'page' : undefined}
+            onClick={() => setActivePage('chat')}
+          >
+            Trò chuyện
+          </button>
           <span className="nav-item disabled">Quiz</span>
           <span className="nav-item disabled">Phân tích</span>
         </nav>
       </aside>
 
       <main className="main-content">
+        {activePage === 'documents' ? (
+          <>
         <header className="page-header">
           <div>
             <span className="eyebrow">Knowledge workspace</span>
@@ -262,6 +280,21 @@ function App() {
             </div>
           )}
         </section>
+          </>
+        ) : (
+          <>
+            <header className="page-header">
+              <div>
+                <span className="eyebrow">Knowledge workspace</span>
+                <h1>Trò chuyện với tài liệu</h1>
+                <p>
+                  Đặt câu hỏi và xem câu trả lời cùng nguồn tài liệu.
+                </p>
+              </div>
+            </header>
+            <ChatPanel documents={documents} />
+          </>
+        )}
       </main>
     </div>
   )

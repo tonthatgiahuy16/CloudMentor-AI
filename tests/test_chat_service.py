@@ -1,5 +1,4 @@
 import pytest
-
 from app.services.chat_service import ChatService
 
 
@@ -10,8 +9,17 @@ class FakeEmbedder:
 
 
 class FakeRetriever:
-    def search(self, vector):
+    def __init__(self):
+        self.subject_ids = []
+
+    def search(
+        self,
+        vector,
+        subject_id=None,
+    ):
         assert vector == [0.1, 0.2]
+        self.subject_ids.append(subject_id)
+
         return [
             {
                 "chunk_id": "chunk-1",
@@ -26,7 +34,6 @@ class FakeRetriever:
             }
         ]
 
-
 class FakeGenerator:
     def generate(self, question, contexts):
         assert question == "What is cloud computing?"
@@ -35,19 +42,22 @@ class FakeGenerator:
 
 
 def test_chat_service_orchestrates_dependencies_and_sources():
+
+    retriever = FakeRetriever()
+
     service = ChatService(
         embedder=FakeEmbedder(),
-        retriever=FakeRetriever(),
+        retriever=retriever,
         generator=FakeGenerator(),
     )
 
-    result = service.ask("  What is cloud computing?  ")
+    result = service.ask("  What is cloud computing?  ", subject_id="subject-1")
 
     assert result["answer"] == "An on-demand computing model."
     assert result["question"] == "What is cloud computing?"
     assert result["sources"][0]["distance"] == 0.123
     assert result["sources"][0]["page"] == 4
-
+    assert retriever.subject_ids == ["subject-1"]
 
 def test_chat_service_rejects_blank_question():
     service = ChatService(
@@ -61,7 +71,7 @@ def test_chat_service_rejects_blank_question():
 
 
 class EmptyRetriever:
-    def search(self, vector):
+    def search(self, vector, subject_id=None):
         assert vector == [0.1, 0.2]
         return []
 
@@ -94,7 +104,11 @@ def test_chat_service_does_not_generate_without_context():
     }
 
 class RetrieverWithMissingLineage:
-    def search(self, vector):
+    def search(
+        self,
+        vector,
+        subject_id=None,
+        ):
         assert vector == [0.1, 0.2]
 
         return [

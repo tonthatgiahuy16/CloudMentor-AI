@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -74,3 +75,26 @@ def test_list_all_returns_empty_list(
     repository = SubjectRepository(db_session)
 
     assert repository.list_all() == []
+
+
+def test_create_persists_subject(db_session):
+    repository = SubjectRepository(db_session)
+
+    subject = repository.create(name="Data Engineering")
+
+    assert subject.subject_id is not None
+    assert subject.name == "Data Engineering"
+    assert db_session.query(Subject).one().subject_id == subject.subject_id
+
+
+def test_create_rolls_back_when_name_already_exists(db_session):
+    repository = SubjectRepository(db_session)
+    repository.create(name="Data Engineering")
+
+    with pytest.raises(IntegrityError):
+        repository.create(name="Data Engineering")
+
+    assert [
+        subject.name
+        for subject in repository.list_all()
+    ] == ["Data Engineering"]

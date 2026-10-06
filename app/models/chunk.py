@@ -9,6 +9,7 @@ class Chunk:
 
     id: str
     document_id: str
+    subject_id: str
     chunk_index: int
     page: int
     source: str

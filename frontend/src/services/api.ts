@@ -4,7 +4,10 @@ import type {
   UploadDocumentInput,
   UploadDocumentResult,
 } from '../types/document'
+
 import type { SubjectRecord } from '../types/subject'
+
+import type { ChatResponse } from '../types/chat'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -65,6 +68,32 @@ export async function getSubjects(): Promise<SubjectRecord[]> {
   return response.json()
 }
 
+export async function createSubject(
+  name: string,
+): Promise<SubjectRecord> {
+  const response = await fetch(
+    `${API_BASE_URL}/subjects/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tạo môn học',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
 export async function uploadDocument(
   input: UploadDocumentInput,
 ): Promise<UploadDocumentResult> {
@@ -112,6 +141,37 @@ export async function deleteDocument(
       await getErrorMessage(
         response,
         'Không thể xóa tài liệu',
+      ),
+    )
+  }
+
+  return response.json()
+
+}
+
+export async function askQuestion(
+  question: string,
+  subjectId: string,
+): Promise<ChatResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/chat/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        question,
+        subject_id: subjectId,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể nhận câu trả lời',
       ),
     )
   }

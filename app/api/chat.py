@@ -27,5 +27,6 @@ def chat(
     chat_service=Depends(get_chat_service),
 ):
     return chat_service.ask(
-        request.question
+        request.question,
+        subject_id=request.subject_id,
     )

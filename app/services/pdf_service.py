@@ -48,7 +48,8 @@ class PDFService:
 
             documents = self.extract.run(
                 file_path,
-                document_id
+                document_id,
+                subject_id,
             )
 
             stage = "TRANSFORM"

@@ -13,3 +13,16 @@ class SubjectRepository:
             .order_by(Subject.name.asc())
             .all()
         )
+
+    def create(self, *, name: str) -> Subject:
+        subject = Subject(name=name)
+        self.db.add(subject)
+
+        try:
+            self.db.commit()
+            self.db.refresh(subject)
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return subject

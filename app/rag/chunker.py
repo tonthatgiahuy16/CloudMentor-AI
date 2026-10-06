@@ -29,6 +29,7 @@ class TextChunker:
                 end = start + self.chunk_size
                 chunks.append(
                     Chunk(
+                        subject_id=document.subject_id,
                         id=str(uuid.uuid4()),
                         document_id=document.document_id,
                         chunk_index=chunk_index,

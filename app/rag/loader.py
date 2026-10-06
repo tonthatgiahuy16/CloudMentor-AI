@@ -10,7 +10,7 @@ from app.models.document import Document
 class PDFLoader:
     """Read a PDF into page-level documents with lineage metadata."""
 
-    def load(self, pdf_path: str, document_id: str) -> List[Document]:
+    def load(self, pdf_path: str, document_id: str, subject_id: str) -> List[Document]:
         pdf_file = Path(pdf_path)
 
         if not pdf_file.exists():
@@ -25,6 +25,7 @@ class PDFLoader:
         documents = [
             Document(
                 document_id=document_id,
+                subject_id=subject_id,
                 page=page_number,
                 source=pdf_file.name,
                 text=page.extract_text() or "",

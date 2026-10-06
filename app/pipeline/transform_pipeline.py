@@ -23,6 +23,7 @@ class TransformPipeline:
 
             cleaned_documents.append(
                 Document(
+                    subject_id=document.subject_id,
                     page=document.page,
                     source=document.source,
                     text=cleaned_text,

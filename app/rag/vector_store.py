@@ -53,6 +53,7 @@ class VectorStore:
                 {
                     "chunk_index": chunk.chunk_index,
                     "document_id": chunk.document_id,
+                    "subject_id": chunk.subject_id,
                     "page": chunk.page,
                     "source": chunk.source,
                     

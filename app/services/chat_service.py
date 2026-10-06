@@ -28,14 +28,17 @@ class ChatService:
         self.retriever = retriever
         self.generator = generator
 
-    def ask(self, question: str) -> dict[str, Any]:
+    def ask(self, question: str, subject_id: str | None = None) -> dict[str, Any]:
         normalized_question = question.strip()
         if not normalized_question:
             raise ValueError("question must not be empty")
 
         logger.info("Question received")
         query_vector = self.embedder.embed_query(normalized_question)
-        results = self.retriever.search(query_vector)
+        results = self.retriever.search(
+            query_vector,
+            subject_id=subject_id,
+        )
 
         if not results:
             logger.info(
