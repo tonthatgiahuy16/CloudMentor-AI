@@ -171,22 +171,9 @@ Interactive API documentation is available at `http://127.0.0.1:8000/docs` while
 
 ## Verification status
 
-Verification evidence for commit [`1570eb1`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/1570eb10a2d7814138f16e38d232288e7080e41e) on **2026-10-06**:
+The current application baseline, capability matrix, CI evidence, verified boundaries, and remaining limitations are recorded in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 
-- `pytest`: 58 tests passed during the feature integration and the current 58-test suite passed in CI.
-- Frontend lint: passed locally and in CI.
-- Frontend production build: passed locally and in CI.
-- GitHub Actions: [successful workflow run](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/runs/37407376887).
-- Manual creation of a new subject.
-- Manual subject-scoped question answering with source references displayed in the frontend.
-- A controlled legacy metadata migration verified with dry run, apply, and a second dry run that reported no remaining missing `subject_id` values.
-
-Still missing as reproducible evidence:
-
-- One automated end-to-end test covering subject creation through deletion and retrieval exclusion.
-- A benchmark for retrieval relevance, citation correctness, and answer faithfulness.
-- A recorded UI screenshot or short GIF in this README.
-- Automated PostgreSQL-Chroma reconciliation and index rebuilding.
+The long-term approved design is documented in [`docs/TARGET_ARCHITECTURE.md`](docs/TARGET_ARCHITECTURE.md).
 
 ## Repository structure
 
@@ -205,6 +192,9 @@ CloudMentor-AI/
 |   |-- repos/           # persistence access
 |   |-- schemas/         # API request and response models
 |   `-- services/        # application orchestration
+|-- docs/
+|   |-- PROJECT_STATUS.md
+|   `-- TARGET_ARCHITECTURE.md
 |-- frontend/            # React + TypeScript client
 |-- scripts/             # controlled maintenance and migration scripts
 |-- storage/             # generated local runtime storage; Git-ignored
@@ -266,14 +256,14 @@ Adjust the PostgreSQL version in the path for the local installation. This is a 
 
 ## Tests and checks
 
-Run backend tests from `backend/`:
+Run backend tests from the repository root:
 
 ```powershell
 python -m pytest -q -p no:cacheprovider --basetemp .codex_pytest_tmp
 Remove-Item .codex_pytest_tmp -Recurse -Force
 ```
 
-Run frontend checks from `backend/frontend/`:
+Run frontend checks from `frontend/`:
 
 ```powershell
 npm run lint
@@ -289,7 +279,7 @@ git diff --cached --check
 
 ## Legacy subject metadata migration
 
-The repository includes a controlled script for backfilling missing `subject_id` metadata in legacy Chroma chunks. In the verified local run, a dry run identified 223 missing values, the apply step updated them, and a second dry run reported zero remaining missing values.
+The repository includes a controlled script for backfilling missing `subject_id` metadata in legacy Chroma chunks. Migration evidence is recorded in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 
 The script contains project-specific mappings. Review the mapping, back up the Chroma data, and run a dry run before applying it to another environment.
 
@@ -302,17 +292,6 @@ The script contains project-specific mappings. Review the mapping, back up the C
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
 - Authentication, authorization, rate limiting, observability, and production deployment are not implemented.
 - Dedicated health and readiness checks are not implemented.
-
-## Roadmap
-
-1. Define durable canonical content storage and record URI/checksum metadata.
-2. Implement automated Chroma rebuild and PostgreSQL-Chroma reconciliation.
-3. Make ingestion idempotent and safe across retries and partial failures.
-4. Add a reproducible end-to-end test for the full local vertical slice.
-5. Build a retrieval and answer-quality evaluation dataset.
-6. Add structured logging, metrics, health checks, and operational diagnostics.
-7. Add a short product screenshot or GIF to the README.
-8. Extend the trusted data backbone to quiz generation and learning analytics.
 
 ## Engineering principles
 
