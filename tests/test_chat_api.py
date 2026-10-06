@@ -12,8 +12,12 @@ class FakeChatService:
         self.result = result
         self.calls = []
 
-    def ask(self, question):
-        self.calls.append(question)
+    def ask(
+        self,
+        question,
+        subject_id=None,
+        ):
+        self.calls.append((question, subject_id))
         return self.result
 
 
@@ -56,7 +60,7 @@ def test_chat_returns_answer_and_sources():
     assert response.status_code == 200
     assert response.json() == service.result
     assert service.calls == [
-        "Cloud computing là gì?"
+        ("Cloud computing là gì?", None)
     ]
 
 
@@ -100,3 +104,26 @@ def test_chat_service_is_reused(monkeypatch):
         assert len(created) == 1
     finally:
         get_chat_service.cache_clear()
+
+def test_chat_passes_subject_id_to_service():
+    service = FakeChatService(
+        result={
+            "question": "AWS là gì?",
+            "answer": "AWS là nền tảng cloud.",
+            "sources": [],
+        }
+    )
+    client = make_client(service)
+
+    response = client.post(
+        "/chat/",
+        json={
+            "question": "AWS là gì?",
+            "subject_id": "subject-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [
+        ("AWS là gì?", "subject-1"),
+    ]

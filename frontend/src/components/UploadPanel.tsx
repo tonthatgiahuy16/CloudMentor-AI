@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import {
+  createSubject,
   getSubjects,
   uploadDocument,
 } from '../services/api'
@@ -20,9 +21,11 @@ function UploadPanel({
 
   const [subjects, setSubjects] = useState<SubjectRecord[]>([])
   const [subjectId, setSubjectId] = useState('')
+  const [newSubjectName, setNewSubjectName] = useState('')
   const [chapter, setChapter] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true)
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -59,6 +62,40 @@ function UploadPanel({
       isActive = false
     }
   }, [])
+
+  async function handleCreateSubject(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+
+    const name = newSubjectName.trim()
+    if (!name || isCreatingSubject) return
+
+    setIsCreatingSubject(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const created = await createSubject(name)
+
+      setSubjects((current) => (
+        [...current, created].sort((left, right) => (
+          left.name.localeCompare(right.name, 'vi')
+        ))
+      ))
+      setSubjectId(created.subject_id)
+      setNewSubjectName('')
+      setSuccess(`Đã thêm môn học ${created.name}`)
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Không thể tạo môn học',
+      )
+    } finally {
+      setIsCreatingSubject(false)
+    }
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -142,7 +179,37 @@ function UploadPanel({
         <span className="upload-limit">PDF · tối đa 10 MB</span>
       </div>
 
-      <form ref={formRef} onSubmit={handleSubmit}>
+      <form
+        className="subject-create-form"
+        onSubmit={handleCreateSubject}
+      >
+        <label className="form-field" htmlFor="new-subject-name">
+          <span>Thêm môn học mới</span>
+          <input
+            id="new-subject-name"
+            type="text"
+            maxLength={255}
+            placeholder="Ví dụ: Data Engineering"
+            value={newSubjectName}
+            onChange={(event) => setNewSubjectName(event.target.value)}
+          />
+        </label>
+        <button
+          className="secondary-action-button"
+          type="submit"
+          disabled={!newSubjectName.trim() || isCreatingSubject}
+        >
+          {isCreatingSubject ? 'Đang thêm...' : 'Thêm môn'}
+        </button>
+      </form>
+
+      <div className="upload-divider" aria-hidden="true" />
+
+      <form
+        className="upload-form"
+        ref={formRef}
+        onSubmit={handleSubmit}
+      >
         <label className="form-field">
           <span>Môn học</span>
           <select

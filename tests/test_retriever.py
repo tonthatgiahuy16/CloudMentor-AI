@@ -52,3 +52,22 @@ def test_retriever_handles_empty_result():
 def test_retriever_rejects_invalid_top_k():
     with pytest.raises(ValueError):
         Retriever(FakeStore({})).search([1.0], top_k=0)
+
+def test_retriever_adds_subject_filter_when_present():
+    store = FakeStore(
+        {
+            "ids": [["chunk-1"]],
+            "documents": [["context"]],
+            "metadatas": [[{"page": 3}]],
+            "distances": [[0.12345]],
+        }
+    )
+
+    Retriever(store).search(
+        [0.2, 0.8],
+        subject_id="subject-1",
+    )
+
+    assert store.collection.kwargs["where"] == {
+        "subject_id": "subject-1",
+    }

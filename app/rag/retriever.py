@@ -15,6 +15,7 @@ class Retriever:
         query_embedding: Any,
         top_k: int = config.TOP_K,
         threshold: float = config.SIMILARITY_THRESHOLD,
+        subject_id: str | None = None,
     ) -> list[dict[str, Any]]:
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero")
@@ -24,10 +25,15 @@ class Retriever:
             if hasattr(query_embedding, "tolist")
             else list(query_embedding)
         )
-        results = self.collection.query(
-            query_embeddings=[embedding],
-            n_results=top_k,
-        )
+        query_options = {
+            "query_embeddings": [embedding],
+            "n_results": top_k,
+        }
+        if subject_id is not None:
+            query_options["where"] = {"subject_id": subject_id}
+
+        results = self.collection.query(**query_options)
+
         groups = (
             results.get("ids", []),
             results.get("documents", []),
