@@ -2,199 +2,332 @@
 
 [![Tests](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml/badge.svg)](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml)
 
-> An in-progress document-data backbone for RAG applications, built around modular PDF ingestion, traceable metadata, PostgreSQL lifecycle records, and a rebuildable Chroma index.
+> A document-data platform for subject-scoped RAG, built around traceable ingestion, PostgreSQL lifecycle management, and a Chroma vector index designed to be rebuildable.
 
-CloudMentor AI is a personal project I am building as a final-year Data Science student. It explores how learning documents can be converted into structured, traceable data for backend services and LLM-based applications.
+CloudMentor AI is a final-year Data Science project that explores how learning documents can be converted into structured, traceable data for retrieval and LLM-based applications.
 
-The main focus is the **data backbone**: ingestion stages, metadata propagation, storage boundaries, retrieval, validation, and testability. The LLM is a downstream consumer rather than the center of the architecture.
+Data Engineering is the backbone of the project. The main concerns are ingestion, metadata propagation, lifecycle state, data ownership, retrieval boundaries, validation, and recovery. RAG and the frontend consume the data produced by that backbone.
+
+## Current milestone
+
+CloudMentor AI currently implements the components required for a local vertical slice:
+
+```text
+create subject
+    -> upload PDF
+    -> extract, clean, chunk, embed, and index
+    -> track document lifecycle in PostgreSQL
+    -> ask a subject-scoped question
+    -> return an answer constrained by retrieved context
+    -> show document and page references
+    -> delete the document from active retrieval
+```
+
+The individual components and selected integrations have been tested locally. The complete sequence above has not yet been captured as one reproducible end-to-end test on the current commit, so the project does not claim production readiness.
 
 ## What this project demonstrates
 
-- A modular **Extract -> Transform -> Chunk -> Embed -> Index** ingestion flow.
-- The current ingestion path carries page- and chunk-level lineage from each PDF into retrieval results.
-- PostgreSQL lifecycle records connected to ingestion, with Chroma kept as a derived retrieval index linked by `document_id`.
-- Clear boundaries between ingestion, persistence, retrieval, API, and generation components.
-- Dependency-injected chat orchestration that can be tested without live model services.
-- Automated unit and API tests running in GitHub Actions.
+- A modular **Extract -> Transform -> Chunk -> Embed -> Index** pipeline.
+- Page-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
+- PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
+- Subject-scoped retrieval to keep queries inside the selected knowledge domain.
+- Context-constrained LLM answers with document and page references.
+- Clear boundaries between API, services, repositories, pipeline stages, retrieval, and generation.
+- Dependency injection that allows API and orchestration tests to run without live external services.
+- Automated backend and frontend checks in GitHub Actions.
 
-## Current status
+## Technology stack
 
-The repository contains a working ingestion and retrieval foundation, but it is **not a production system**.
-
-A live local run exercised the ingest-to-retrieve path with PostgreSQL, BGE-M3, and Chroma. The document reached `INDEXED` in PostgreSQL, 177 Chroma chunks shared its `document_id`. A separate local query returned three results across two stored documents.
-
-### Implemented
-
-- FastAPI endpoints for PDF upload and chat requests.
-- PDF extraction, text cleaning, overlapping chunking, embeddings, and persistent Chroma indexing.
-- Retrieval results from the current ingestion path contain `document_id`, `chunk_index`, page, source, and vector distance.
-- Gemini-based answer generation using retrieved context.
-- PostgreSQL-backed upload lifecycle transitions from `UPLOADED` to `PROCESSING` and `INDEXED`, with failure stage and error details recorded as `FAILED`.
-- Safer PDF upload handling: extension, MIME type, file signature, filename, and 10 MB size checks.
-- UUID-prefixed server filenames and cleanup when ingestion fails.
-- Input validation for chat questions and chunk configuration.
-- Pytest coverage for cleaning, loading, chunking, transformation, retrieval, chat orchestration, schemas, and upload validation.
-- GitHub Actions checks for Python syntax and tests on pushes and pull requests.
-
-### In progress
-
-- Using PostgreSQL lifecycle records for retrieval filtering and document deletion.
-- Integration tests for PostgreSQL, Chroma, embedding, and Gemini boundaries.
-- Document deletion and PostgreSQL-Chroma reconciliation.
-- A reproducible local environment with Docker Compose and health checks.
-- A small retrieval-quality benchmark.
-
-### Deliberately not claimed
-
-- Production deployment or operational monitoring.
-- Kafka or Spark processing without a justified workload.
-- Quiz, learning-history, or ML-personalization features.
+| Layer | Technology | Role |
+| --- | --- | --- |
+| API | FastAPI | Upload, document, subject, and chat endpoints |
+| Relational storage | PostgreSQL + SQLAlchemy | Document metadata and lifecycle state |
+| PDF extraction | PyMuPDF | Page-level text extraction |
+| Embeddings | BGE-M3 | Document and query vector generation |
+| Vector index | Chroma | Similarity search over derived chunk embeddings |
+| Generation | Gemini | Answer generation from retrieved context |
+| Frontend | React + TypeScript + Vite | Document library, upload, subject management, and chat |
+| Quality checks | Pytest, ESLint, TypeScript, GitHub Actions | Regression and build validation |
 
 ## Data flow
 
 ```text
 PDF upload
-   -> validate and store safely
-   -> create PostgreSQL document record
-   -> mark PROCESSING
-   -> extract text by page
-   -> normalize text
-   -> create overlapping chunks + lineage metadata
-   -> generate BGE-M3 embeddings
-   -> index in Chroma
-   -> mark INDEXED
+    -> validate extension, MIME type, signature, filename, and size
+    -> retain the accepted PDF in local upload storage
+    -> create PostgreSQL document record as UPLOADED
+    -> mark PROCESSING
+    -> extract text by page
+    -> normalize text
+    -> create overlapping chunks with lineage metadata
+    -> generate embeddings
+    -> write derived vectors and metadata to Chroma
+    -> mark INDEXED
 
 Pipeline failure
-   -> record FAILED status, stage, and error in PostgreSQL
+    -> record FAILED status, failure stage, and error details
 
-Question
-   -> embed query
-   -> retrieve relevant chunks
-   -> generate answer with Gemini
-   -> return answer + sources
+Question + optional subject_id
+    -> embed question
+    -> retrieve matching chunks, filtered by subject when selected
+    -> generate an answer constrained by retrieved context
+    -> return answer plus document and page references
 ```
-
-## Traceability
-
-For documents processed through the current ingestion path, retrieval results keep enough metadata to trace an answer back to its source:
-
-- `document_id`
-- `chunk_index`
-- page
-- source filename
-- vector distance
-
-This is the foundation for source-grounded answers, document-level filtering, deletion, and later retrieval evaluation.
-
-## Storage boundaries
-
-| Store | Responsibility | Current state |
-| --- | --- | --- |
-| PostgreSQL | Canonical subject and document lifecycle records | Connected to upload ingestion for `UPLOADED`, `PROCESSING`, `INDEXED`, and `FAILED` states |
-| Chroma | Persistent embeddings and retrieval metadata | Used by the current ingestion and retrieval path |
-
-The intended design treats Chroma as a rebuildable index, not the canonical record of uploaded documents.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    U[PDF upload] --> V[Validation]
-    V -->|UPLOADED → PROCESSING| PG[(PostgreSQL lifecycle)]
-    V --> EX[Extract by page]
-    EX --> TR[Normalize text]
-    TR --> CK[Chunk + lineage]
-    CK --> EM[BGE-M3 embeddings]
-    EM --> CH[(Chroma index)]
-    CH -->|INDEXED| PG
+    UI[React frontend] --> API[FastAPI]
+    API --> SUBJECTS[Subject service]
+    API --> UPLOAD[Upload service]
+    API --> CHAT[Chat service]
+    API --> DOCS[Document service]
 
-    Q[Question] --> QE[Query embedding]
-    QE --> RT[Retriever]
-    CH --> RT
-    RT --> GM[Gemini]
-    GM --> A[Answer + sources]
+    SUBJECTS --> PG[(PostgreSQL\nmetadata + lifecycle)]
+    DOCS --> PG
+    UPLOAD --> FILES[(Local upload storage\nretained source PDFs)]
+    UPLOAD --> PIPELINE[Extract -> Transform -> Chunk -> Embed]
+    PIPELINE --> CHROMA[(Chroma\nderived retrieval index)]
+    UPLOAD --> PG
+
+    CHAT --> CHROMA
+    CHAT --> LLM[Gemini]
+    CHAT --> UI
 ```
+
+The local upload directory currently retains successfully ingested PDFs, but it is not yet a durable production storage contract.
+
+## Data ownership and recovery boundary
+
+| Data | Current owner | Recovery meaning |
+| --- | --- | --- |
+| Subject, document metadata, and lifecycle state | PostgreSQL | System of record for operational state |
+| Accepted source PDF | Local upload storage | Retained locally after successful ingestion; not yet durable storage |
+| Chunk embeddings and retrieval metadata | Chroma | Derived index used for retrieval |
+| Generated answer | API response | Not currently treated as a durable record |
+
+PostgreSQL is the system of record for document metadata and lifecycle state. Chroma is a derived retrieval index. Automated index rebuilding is not yet implemented and remains part of the recovery roadmap.
+
+A reliable rebuild also requires a durable canonical content source. The project must eventually formalize one of these approaches:
+
+1. Store original PDFs in durable object storage, with URI and checksum recorded in PostgreSQL.
+2. Store canonical extracted content or chunks in PostgreSQL or object storage.
+
+Until one of those contracts and an automated rebuild workflow are implemented, Chroma is only **designed to be rebuildable**; it is not yet operationally rebuildable.
+
+## Document lifecycle
+
+```text
+UPLOADED -> PROCESSING -> INDEXED
+                      \-> FAILED
+```
+
+- `UPLOADED`: the file passed API validation and a document record was created.
+- `PROCESSING`: extraction, transformation, embedding, or indexing is running.
+- `INDEXED`: vector entries were written successfully.
+- `FAILED`: the failed stage and error details were recorded for diagnosis.
+
+Deletion removes the document from the active application view and retrieval path. Cross-store reconciliation and automated recovery remain roadmap items.
+
+## Traceability
+
+The ingestion path carries metadata needed to trace a retrieval result back to the source material:
+
+- `document_id`
+- `subject_id`
+- `source`
+- `page`
+- `chunk_index`
+- vector distance
+
+The chat API returns document and page references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. Retrieval quality, citation correctness, and answer faithfulness still require a benchmark and evaluation dataset.
+
+## API surface
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | API root message |
+| `GET` | `/subjects/` | List subjects |
+| `POST` | `/subjects/` | Create a subject |
+| `POST` | `/upload/` | Validate and ingest a PDF |
+| `GET` | `/documents/` | List active documents |
+| `GET` | `/documents/{document_id}` | Read document metadata |
+| `DELETE` | `/documents/{document_id}` | Remove a document from active use |
+| `POST` | `/chat/` | Ask a question and receive answer plus sources |
+
+`GET /` is an API root message, not a health check. Dedicated health and readiness endpoints have not yet been implemented.
+
+Interactive API documentation is available at `http://127.0.0.1:8000/docs` while the backend is running.
+
+## Frontend capabilities
+
+- List documents and their processing status.
+- Upload a PDF for a selected subject and chapter.
+- Create a new subject from the document workspace.
+- Delete a document.
+- Select a subject before asking a question.
+- Render the answer and its document/page references.
+
+## Verification status
+
+Verification evidence for commit [`1570eb1`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/1570eb10a2d7814138f16e38d232288e7080e41e) on **2026-10-06**:
+
+- `pytest`: 58 tests passed during the feature integration and the current 58-test suite passed in CI.
+- Frontend lint: passed locally and in CI.
+- Frontend production build: passed locally and in CI.
+- GitHub Actions: [successful workflow run](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/runs/37407376887).
+- Manual creation of a new subject.
+- Manual subject-scoped question answering with source references displayed in the frontend.
+- A controlled legacy metadata migration verified with dry run, apply, and a second dry run that reported no remaining missing `subject_id` values.
+
+Still missing as reproducible evidence:
+
+- One automated end-to-end test covering subject creation through deletion and retrieval exclusion.
+- A benchmark for retrieval relevance, citation correctness, and answer faithfulness.
+- A recorded UI screenshot or short GIF in this README.
+- Automated PostgreSQL-Chroma reconciliation and index rebuilding.
 
 ## Repository structure
 
 ```text
 CloudMentor-AI/
-├── .github/workflows/   # CI test workflow
-├── app/
-│   ├── api/             # FastAPI routes and request validation
-│   ├── core/            # Configuration, database, and logging
-│   ├── db_models/       # SQLAlchemy models
-│   ├── llm/             # Gemini client and prompts
-│   ├── models/          # Pipeline data models
-│   ├── pipeline/        # Ingestion stages
-│   ├── rag/             # Loader, chunker, embeddings, index, retrieval
-│   └── services/        # Upload and chat orchestration
-├── alembic/             # Database migrations
-├── scripts/             # Manual service probes
-├── tests/               # Isolated pytest unit and API tests
-├── requirements.txt
-└── requirements-test.txt
+|-- .github/
+|   `-- workflows/       # backend and frontend CI checks
+|-- alembic/             # database migrations
+|-- app/
+|   |-- api/             # FastAPI routes
+|   |-- core/            # configuration and database setup
+|   |-- db_models/       # SQLAlchemy persistence models
+|   |-- llm/             # prompt and model integration
+|   |-- pipeline/        # extraction, transformation, and indexing stages
+|   |-- rag/             # loader, chunker, embedder, retriever, vector store
+|   |-- repos/           # persistence access
+|   |-- schemas/         # API request and response models
+|   `-- services/        # application orchestration
+|-- frontend/            # React + TypeScript client
+|-- scripts/             # controlled maintenance and migration scripts
+|-- storage/             # generated local runtime storage; Git-ignored
+|-- tests/               # backend unit and API tests
+|-- alembic.ini
+|-- pyproject.toml
+|-- requirements.txt
+|-- requirements-test.txt
+`-- README.md
 ```
 
-## Local setup
+## Local development
 
-Create and activate a virtual environment, then install the application dependencies:
+### Prerequisites
 
-```bash
+- Python 3.11
+- Node.js and npm
+- PostgreSQL
+- A Gemini API key
+
+### Backend
+
+```powershell
+cd CloudMentor-AI
 python -m venv .venv
-pip install -r requirements.txt
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Copy `.env.example` to `.env` and set local values:
+Set the required values in `.env`, then start the API:
 
-```env
-DATABASE_URL=postgresql+psycopg://cloudmentor:cloudmentor@localhost:5432/cloudmentor
-GEMINI_API_KEY=replace_with_your_key
-MODEL_NAME=gemini-2.5-flash
+```powershell
+python -m uvicorn app.main:app --reload
 ```
 
-Run migrations and start the API:
+Do not commit `.env`, API keys, passwords, or connection strings.
 
-```bash
-alembic upgrade head
-uvicorn app.main:app --reload
+### Frontend
+
+```powershell
+cd frontend
+npm ci
+npm run dev
 ```
 
-Open `http://127.0.0.1:8000/docs` for the API documentation.
+The local frontend expects the API at `http://127.0.0.1:8000` unless a Vite environment override is configured.
 
-## Tests
+### Windows application-control note
 
-The automated suite is isolated from live PostgreSQL, Chroma, embedding-model, and Gemini services.
+On a Windows machine where Application Control blocks binary Python extensions, the PostgreSQL driver may need its pure-Python implementation and the PostgreSQL client libraries on `PATH`:
 
-```bash
-pip install -r requirements-test.txt
-pytest -q
+```powershell
+$env:Path = "C:\Program Files\PostgreSQL\18\bin;$env:Path"
+$env:PSYCOPG_IMPL = "python"
 ```
 
-The same checks run in GitHub Actions. A manual local smoke run has exercised PostgreSQL, BGE-M3, Chroma, and retrieval together; repeatable automated integration coverage and retrieval-quality evaluation remain separate milestones.
+Adjust the PostgreSQL version in the path for the local installation. This is a machine-specific workaround, not an application configuration requirement.
 
-## Known limitations
+## Tests and checks
 
-- PostgreSQL lifecycle state is connected to ingestion, but retrieval filtering and deletion do not use it yet; legacy indexes created before lifecycle integration may lack `document_id` and need re-ingestion or reconciliation.
-- There is no transaction or compensation strategy across PostgreSQL and Chroma yet.
-- Live Chroma, embedding, Gemini, and PostgreSQL integration is not covered by CI.
-- Retrieval quality has not been measured against a curated benchmark.
-- Docker Compose, health checks, deployment, and monitoring are not implemented.
+Run backend tests from `backend/`:
+
+```powershell
+python -m pytest -q -p no:cacheprovider --basetemp .codex_pytest_tmp
+Remove-Item .codex_pytest_tmp -Recurse -Force
+```
+
+Run frontend checks from `backend/frontend/`:
+
+```powershell
+npm run lint
+npm run build
+```
+
+Check staged or unstaged whitespace errors before committing:
+
+```powershell
+git diff --check
+git diff --cached --check
+```
+
+## Legacy subject metadata migration
+
+The repository includes a controlled script for backfilling missing `subject_id` metadata in legacy Chroma chunks. In the verified local run, a dry run identified 223 missing values, the apply step updated them, and a second dry run reported zero remaining missing values.
+
+The script contains project-specific mappings. Review the mapping, back up the Chroma data, and run a dry run before applying it to another environment.
+
+## Current limitations
+
+- Source PDFs are retained on local disk rather than durable object storage.
+- Automated Chroma rebuild and PostgreSQL-Chroma reconciliation are not implemented.
+- Ingestion is not yet fully idempotent across retries and partial failures.
+- Retrieval quality and answer faithfulness have not been benchmarked.
+- Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
+- Authentication, authorization, rate limiting, observability, and production deployment are not implemented.
+- Dedicated health and readiness checks are not implemented.
 
 ## Roadmap
 
-1. Use PostgreSQL lifecycle records for retrieval filtering and deletion.
-2. Add idempotent ingestion and document-level duplicate detection.
-3. Add deletion and PostgreSQL-Chroma reconciliation.
-4. Add live-service integration tests.
-5. Add Docker Compose and health checks.
-6. Build a retrieval-evaluation dataset and track grounding quality.
+1. Define durable canonical content storage and record URI/checksum metadata.
+2. Implement automated Chroma rebuild and PostgreSQL-Chroma reconciliation.
+3. Make ingestion idempotent and safe across retries and partial failures.
+4. Add a reproducible end-to-end test for the full local vertical slice.
+5. Build a retrieval and answer-quality evaluation dataset.
+6. Add structured logging, metrics, health checks, and operational diagnostics.
+7. Add a short product screenshot or GIF to the README.
+8. Extend the trusted data backbone to quiz generation and learning analytics.
+
+## Engineering principles
+
+- PostgreSQL owns metadata and lifecycle state.
+- Chroma is a derived retrieval index, not the source of truth.
+- Every chunk should preserve lineage back to its subject, document, page, and chunk position.
+- Pipeline stages should be independently testable and observable.
+- Recovery claims must be backed by durable source data and a tested procedure.
+- New infrastructure should be introduced only when the workload justifies it.
 
 ## Author
 
-**Tôn Thất Gia Huy**  
-Final-year Data Science student, expected graduation in 2027.
+**Ton That Gia Huy**
 
-- [Portfolio](https://tonthatgiahuy16.github.io)
-- [GitHub](https://github.com/tonthatgiahuy16)
-- [LinkedIn](https://www.linkedin.com/in/t%C3%B4n-th%E1%BA%A5t-gia-huy-708860369/)
+Final-year Data Science student focused on Data Engineering and applied AI systems.
+
+- GitHub: [tonthatgiahuy16](https://github.com/tonthatgiahuy16)
+- LinkedIn: [ton-that-gia-huy](https://www.linkedin.com/in/ton-that-gia-huy)
