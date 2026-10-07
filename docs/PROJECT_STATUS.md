@@ -6,13 +6,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-10-06 |
-| Application baseline | [`c13c562`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/c13c56293dc33681b0def0bf7a7e83053b98cae6) |
+| Snapshot date | 2026-10-07 |
+| Application baseline | [`89fd45d`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/89fd45dda10212c866f7baaa4ea85d0b00e37e46) |
 | Current milestone | Subject-scoped local RAG vertical slice |
-| Overall state | Core workflow implemented; recovery, reproducibility, and evaluation hardening remain |
-| CI evidence | [GitHub Actions run 37419784086](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/runs/37419784086) |
+| Overall state | Core workflow and manual local end-to-end scenario verified; automation, recovery, and evaluation hardening remain |
+| CI evidence | [GitHub Actions run 37422895674](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/runs/37422895674) |
 
-The status was captured against `main` at `c13c562` before this document receives its own commit.
+The status was captured against `main` at `89fd45d` before this update receives its own commit.
 
 ## Current capability
 
@@ -29,7 +29,7 @@ create subject
     -> delete the document from active use
 ```
 
-The components and selected integrations have been tested, but this complete sequence has not yet been captured as one automated end-to-end test.
+This complete sequence passed a manual local end-to-end test on 2026-10-07 against commit `89fd45d`. It has not yet been captured as an automated reproducible end-to-end test.
 
 ## Capability matrix
 
@@ -44,7 +44,7 @@ The components and selected integrations have been tested, but this complete seq
 | Subject metadata propagation | Implemented | Metadata flows through document, chunk, vector, retrieval, and chat layers |
 | Subject-scoped retrieval | Implemented | Retriever and chat orchestration tests; manual smoke test |
 | Answer and source rendering | Implemented | Frontend renders context-constrained answers with document/page references |
-| Document deletion | Implemented | Implemented in the deletion service and covered by service/API tests; the complete upload-to-delete scenario has not yet been verified as one end-to-end workflow |
+| Document deletion | Implemented and manually verified end-to-end | Covered by service/API tests; after deletion, the repeated question no longer retrieved the deleted document in the verified manual workflow |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Automated Chroma rebuild | Not implemented | Recovery roadmap item |
 | Cross-store reconciliation | Not implemented | PostgreSQL-Chroma consistency roadmap item |
@@ -55,28 +55,26 @@ The components and selected integrations have been tested, but this complete seq
 
 ### Automated
 
-- GitHub Actions completed successfully for application baseline `c13c562` on 2026-10-06.
+- GitHub Actions completed successfully for application baseline `89fd45d` on 2026-10-06.
 - `unit-tests` passed for the current 58-test backend suite.
 - `frontend-checks` passed, including ESLint and the Vite production build.
 - The same frontend lint and production build were also run successfully on the local workspace.
 
-### Manual
+### Manual local end-to-end
 
-- Created a new subject through the application.
-- Selected a subject in the chat workspace.
-- Asked a subject-scoped question and received an answer with document/page references.
-- Verified the legacy Chroma metadata migration with dry run, apply, and no-op second dry run.
+Verified on 2026-10-07 against commit `89fd45d`:
 
-### Not yet verified as one scenario
+- Created a new subject.
+- Uploaded a new PDF.
+- Observed the document reach `INDEXED`.
+- Asked a question whose answer was contained in that PDF.
+- Received an answer with the expected filename and page reference.
+- Deleted the document.
+- Repeated the question and confirmed that the deleted document was no longer returned by retrieval.
 
-- Create subject.
-- Upload a PDF.
-- Observe the document reach `INDEXED`.
-- Ask a subject-scoped question and receive relevant sources.
-- Delete the document.
-- Confirm that the deleted document no longer appears in active retrieval.
+Result: **passed**.
 
-This sequence should become an automated end-to-end test before the project claims a fully reproducible vertical slice.
+The legacy Chroma metadata migration was also verified separately with dry run, apply, and a no-op second dry run. The manual end-to-end sequence should become an automated test before the project claims a fully reproducible vertical slice.
 
 ## Data ownership boundary
 
@@ -103,7 +101,7 @@ PostgreSQL is the system of record for metadata and lifecycle state. Chroma is a
 
 ## Next milestone priorities
 
-1. Add a reproducible end-to-end test for the complete local document lifecycle.
+1. Automate the verified manual end-to-end scenario for the complete local document lifecycle.
 2. Define durable canonical content storage and record URI/checksum metadata.
 3. Make ingestion idempotent across retries and partial failures.
 4. Implement Chroma rebuild and PostgreSQL-Chroma reconciliation workflows.

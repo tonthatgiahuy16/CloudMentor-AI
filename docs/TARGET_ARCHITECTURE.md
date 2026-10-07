@@ -201,7 +201,7 @@ Current setup and test instructions live in the repository [`README`](../README.
 
 | Phase | Status | Completion boundary |
 | --- | --- | --- |
-| Phase 1 — Core Data Foundation and RAG | In progress | Local baseline implemented; reproducible end-to-end verification and recovery hardening remain |
+| Phase 1 — Core Data Foundation and RAG | In progress | Manual local end-to-end workflow verified; automated reproducibility and recovery hardening remain |
 | Phase 2 — Reliability and Multi-source Ingestion | Planned | Starts after Phase 1 verification boundary is met |
 | Phase 3 — Quiz and Learning Application | Planned | — |
 | Phase 4 — Event-driven Processing with Kafka | Planned | — |

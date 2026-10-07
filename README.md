@@ -23,7 +23,7 @@ create subject
     -> delete the document from active retrieval
 ```
 
-The individual components and selected integrations have been tested locally. The complete sequence above has not yet been captured as one reproducible end-to-end test on the current commit, so the project does not claim production readiness.
+The complete sequence above was verified manually on commit [`89fd45d`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/89fd45dda10212c866f7baaa4ea85d0b00e37e46) on 2026-10-07. It has not yet been captured as an automated reproducible end-to-end test, so the project does not claim production readiness.
 
 ## What this project demonstrates
 
