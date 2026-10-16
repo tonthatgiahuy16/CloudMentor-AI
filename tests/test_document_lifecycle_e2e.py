@@ -1,0 +1,372 @@
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+import app.db_models  # Đăng ký các bảng với Base.metadata
+from app.api.subjects import get_subject_repository, router as subjects_router
+from app.core.database import Base
+from app.repos.subject_repository import SubjectRepository
+
+from app.core import config
+from app.rag.vector_store import VectorStore
+
+from pathlib import Path
+
+import numpy as np
+
+from app.api.upload import (
+    get_pdf_service,
+    get_upload_dir,
+    router as upload_router,
+)
+from app.models.chunk import Chunk
+from app.repos.document_repository import DocumentRepository
+
+from app.api.chat import (
+    get_chat_service,
+    router as chat_router,
+)
+from app.rag.retriever import Retriever
+from app.services.chat_service import ChatService
+
+from app.api.documents import (
+    get_document_deletion_service,
+    get_document_repository,
+    router as documents_router,
+)
+from app.services.document_deletion_service import (
+    DocumentDeletionService,
+)
+
+
+class LifecyclePDFService:
+    """
+    Thay thế các bước xử lý nặng trong test nhưng vẫn ghi vào
+    database thật và Chroma thật đã được cô lập.
+    """
+
+    def __init__(
+        self,
+        document_repo,
+        vector_store,
+    ):
+        self.document_repo = document_repo
+        self.vector_store = vector_store
+
+    def upload(
+        self,
+        path,
+        *,
+        subject_id,
+        chapter,
+        document_id,
+        original_filename,
+    ):
+        pdf_path = Path(path)
+
+        if not pdf_path.exists():
+            raise RuntimeError("Uploaded PDF was not saved")
+
+        self.document_repo.create(
+            document_id=document_id,
+            subject_id=subject_id,
+            filename=original_filename,
+            file_type="pdf",
+            chapter=chapter,
+        )
+        self.document_repo.mark_processing(document_id)
+
+        chunk = Chunk(
+            id=f"{document_id}:0",
+            document_id=document_id,
+            subject_id=subject_id,
+            chunk_index=0,
+            page=1,
+            source=original_filename,
+            text="Cloud computing provides computing resources on demand.",
+        )
+
+        embeddings = np.array(
+            [[1.0, 0.0, 0.0]],
+            dtype=np.float32,
+        )
+
+        self.vector_store.add(
+            [chunk],
+            embeddings,
+        )
+        self.document_repo.mark_indexed(document_id)
+
+        return 1
+
+
+class LifecycleQueryEmbedder:
+    def embed_query(self, question):
+        assert question == "Cloud computing là gì?"
+
+        return np.array(
+            [1.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
+
+
+class LifecycleAnswerGenerator:
+    def generate(self, question, contexts):
+        assert question == "Cloud computing là gì?"
+        assert "lesson.pdf" in contexts[0]
+        assert "computing resources on demand" in contexts[0]
+
+        return (
+            "Cloud computing cung cấp "
+            "tài nguyên điện toán theo nhu cầu."
+        )
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    chroma_dir = tmp_path / "chroma"
+
+    monkeypatch.setattr(
+        config,
+        "CHROMA_DIR",
+        chroma_dir,
+    )
+
+    vector_store = VectorStore()
+
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    Base.metadata.create_all(engine)
+
+    TestingSessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
+    db_session = TestingSessionLocal()
+
+    document_repo = DocumentRepository(db_session)
+
+    pdf_service = LifecyclePDFService(
+        document_repo,
+        vector_store,
+    )
+
+    chat_service = ChatService(
+        embedder=LifecycleQueryEmbedder(),
+        retriever=Retriever(vector_store),
+        generator=LifecycleAnswerGenerator(),
+    )
+
+    deletion_service = DocumentDeletionService(
+        document_repo=document_repo,
+        vector_store=vector_store,
+    )
+
+    app = FastAPI()
+
+    app.state.vector_store = vector_store
+    app.state.document_repo = document_repo
+
+    app.include_router(subjects_router)
+    app.include_router(upload_router)
+    app.include_router(chat_router)
+    app.include_router(documents_router)
+
+    app.dependency_overrides[get_pdf_service] = (
+        lambda: pdf_service
+    )
+
+    app.dependency_overrides[get_chat_service] = (
+        lambda: chat_service
+    )
+
+    app.dependency_overrides[
+        get_document_deletion_service
+    ] = lambda: deletion_service
+
+    app.dependency_overrides[
+        get_document_repository
+    ] = lambda: document_repo
+
+    app.dependency_overrides[get_upload_dir] = (
+        lambda: tmp_path
+    )
+
+    app.dependency_overrides[get_subject_repository] = (
+        lambda: SubjectRepository(db_session)
+    )
+
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        db_session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+
+def test_create_subject_is_visible_in_subject_list(client):
+    created = client.post(
+        "/subjects/",
+        json={"name": "Cloud Computing"},
+    )
+
+    assert created.status_code == 201
+    subject = created.json()
+    assert subject["subject_id"]
+
+    listed = client.get("/subjects/")
+
+    assert listed.status_code == 200
+    assert listed.json() == [subject]
+
+
+def test_vector_store_uses_temporary_chroma(
+    client,
+    tmp_path,
+):
+    assert config.CHROMA_DIR == tmp_path / "chroma"
+    assert client.app.state.vector_store.collection.count() == 0
+
+
+def test_document_lifecycle_upload_query_and_delete(client):
+    subject_response = client.post(
+        "/subjects/",
+        json={"name": "Cloud Computing"},
+    )
+    subject_id = subject_response.json()["subject_id"]
+
+    upload_response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.pdf",
+                b"%PDF-1.4\ncontrolled test content",
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": subject_id,
+            "chapter": "1",
+        },
+    )
+
+    assert upload_response.status_code == 201
+
+    payload = upload_response.json()
+    assert payload["filename"] == "lesson.pdf"
+    assert payload["chunks"] == 1
+
+    document = (
+        client.app.state.document_repo.get_by_id(
+            payload["document_id"]
+        )
+    )
+
+    assert document.subject_id == subject_id
+    assert document.status == "INDEXED"
+    assert document.indexed_at is not None
+
+    indexed = (
+        client.app.state.vector_store.collection.get(
+            where={
+                "document_id": payload["document_id"],
+            }
+        )
+    )
+
+    assert len(indexed["ids"]) == 1
+    assert (
+        indexed["metadatas"][0]["subject_id"]
+        == subject_id
+    )
+
+    chat_response = client.post(
+        "/chat/",
+        json={
+            "question": "Cloud computing là gì?",
+            "subject_id": subject_id,
+        },
+    )
+
+    assert chat_response.status_code == 200
+
+    chat_payload = chat_response.json()
+
+    assert chat_payload["answer"] == (
+        "Cloud computing cung cấp "
+        "tài nguyên điện toán theo nhu cầu."
+    )
+    assert len(chat_payload["sources"]) == 1
+    assert (
+        chat_payload["sources"][0]["document_id"]
+        == payload["document_id"]
+    )
+    assert (
+        chat_payload["sources"][0]["source"]
+        == "lesson.pdf"
+    )
+    assert chat_payload["sources"][0]["page"] == 1
+
+    delete_response = client.delete(
+        f"/documents/{payload['document_id']}"
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {
+        "document_id": payload["document_id"],
+        "status": "DELETED",
+        "deleted_chunks": 1,
+    }
+
+    deleted_document = (
+        client.app.state.document_repo.get_by_id(
+            payload["document_id"]
+        )
+    )
+
+    assert deleted_document.status == "DELETED"
+    assert deleted_document.deleted_at is not None
+
+    remaining_chunks = (
+        client.app.state.vector_store.collection.get(
+            where={
+                "document_id": payload["document_id"],
+            }
+        )
+    )
+
+    assert remaining_chunks["ids"] == []
+
+    document_response = client.get(
+        f"/documents/{payload['document_id']}"
+    )
+
+    assert document_response.status_code == 404
+
+    chat_after_delete = client.post(
+        "/chat/",
+        json={
+            "question": "Cloud computing là gì?",
+            "subject_id": subject_id,
+        },
+    )
+
+    assert chat_after_delete.status_code == 200
+    assert chat_after_delete.json() == {
+        "question": "Cloud computing là gì?",
+        "answer": (
+            "Tôi không tìm thấy thông tin "
+            "trong tài liệu."
+        ),
+        "sources": [],
+    }
