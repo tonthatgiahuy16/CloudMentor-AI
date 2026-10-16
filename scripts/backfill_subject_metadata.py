@@ -6,9 +6,9 @@ from pathlib import Path
 import chromadb
 
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-CHROMA_PATH = BACKEND_DIR / "chroma_db"
-BACKUP_PATH = BACKEND_DIR.parent / "chroma_db_before_subject_backfill"
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+CHROMA_PATH = PROJECT_DIR / "chroma_db"
+BACKUP_PATH = PROJECT_DIR / "chroma_db_before_subject_backfill"
 COLLECTION_NAME = "cloudmentor"
 SUBJECT_ID = "1f51e907-c539-48a8-a25f-d355db5afd55"
 EXPECTED_DOCUMENT_CHUNKS = {
