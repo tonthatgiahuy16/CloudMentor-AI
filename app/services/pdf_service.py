@@ -26,6 +26,9 @@ class PDFService:
         chapter: int | None = None,
         document_id: str | None = None,
         original_filename: str | None = None,
+        source_uri: str | None = None,
+        content_sha256: str | None = None,
+        file_size_bytes: int | None = None,
         ):
         if document_id is None:
             document_id = str(uuid4())
@@ -39,7 +42,10 @@ class PDFService:
             subject_id=subject_id,
             filename=filename,
             file_type=file_type,
-            chapter=chapter
+            chapter=chapter,
+            source_uri=source_uri,
+            content_sha256=content_sha256,
+            file_size_bytes=file_size_bytes,
         )
         self.document_repo.mark_processing(document_id)
 

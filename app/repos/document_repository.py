@@ -104,6 +104,9 @@ class DocumentRepository:
         filename: str,
         file_type: str,
         chapter: int | None,
+        source_uri: str | None = None,
+        content_sha256: str | None = None,
+        file_size_bytes: int | None = None,
     ) -> Document:
         document = Document(
             document_id=document_id,
@@ -112,6 +115,9 @@ class DocumentRepository:
             file_type=file_type,
             chapter=chapter,
             status="UPLOADED",
+            source_uri=source_uri,
+            content_sha256=content_sha256,
+            file_size_bytes=file_size_bytes,
         )
 
         self.db.add(document)

@@ -1,6 +1,7 @@
 from sqlalchemy import (
     String,
     Integer,
+    BigInteger,
     DateTime,
     ForeignKey,
     CheckConstraint,
@@ -40,6 +41,22 @@ class Document(Base):
 
     chapter: Mapped[int | None] = mapped_column(
         Integer,
+        nullable=True,
+    )
+
+    source_uri: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    content_sha256: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+    )
+
+    file_size_bytes: Mapped[int | None] = mapped_column(
+        BigInteger,
         nullable=True,
     )
 
@@ -88,5 +105,15 @@ class Document(Base):
             "failed_stage IS NULL OR failed_stage IN "
             "('EXTRACT', 'TRANSFORM', 'CHUNK', 'EMBEDDING', 'INDEX')",
             name="chk_documents_failed_stage",
+        ),
+        CheckConstraint(
+            "content_sha256 IS NULL OR "
+            "length(content_sha256) = 64",
+            name="chk_documents_content_sha256_length",
+        ),
+        CheckConstraint(
+            "file_size_bytes IS NULL OR "
+            "file_size_bytes >= 0",
+            name="chk_documents_file_size_bytes",
         ),
     )

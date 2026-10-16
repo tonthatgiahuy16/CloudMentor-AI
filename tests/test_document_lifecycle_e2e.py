@@ -1,3 +1,7 @@
+from hashlib import sha256
+from pathlib import Path
+
+import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -13,9 +17,6 @@ from app.repos.subject_repository import SubjectRepository
 from app.core import config
 from app.rag.vector_store import VectorStore
 
-from pathlib import Path
-
-import numpy as np
 
 from app.api.upload import (
     get_pdf_service,
@@ -64,6 +65,9 @@ class LifecyclePDFService:
         chapter,
         document_id,
         original_filename,
+        source_uri,
+        content_sha256,
+        file_size_bytes,
     ):
         pdf_path = Path(path)
 
@@ -76,6 +80,9 @@ class LifecyclePDFService:
             filename=original_filename,
             file_type="pdf",
             chapter=chapter,
+            source_uri=source_uri,
+            content_sha256=content_sha256,
+            file_size_bytes=file_size_bytes,
         )
         self.document_repo.mark_processing(document_id)
 
@@ -86,7 +93,10 @@ class LifecyclePDFService:
             chunk_index=0,
             page=1,
             source=original_filename,
-            text="Cloud computing provides computing resources on demand.",
+            text=(
+                "Cloud computing provides computing "
+                "resources on demand."
+            ),
         )
 
         embeddings = np.array(
@@ -239,6 +249,10 @@ def test_vector_store_uses_temporary_chroma(
 
 
 def test_document_lifecycle_upload_query_and_delete(client):
+    pdf_data = (
+        b"%PDF-1.4\ncontrolled test content"
+    )
+
     subject_response = client.post(
         "/subjects/",
         json={"name": "Cloud Computing"},
@@ -250,7 +264,7 @@ def test_document_lifecycle_upload_query_and_delete(client):
         files={
             "file": (
                 "lesson.pdf",
-                b"%PDF-1.4\ncontrolled test content",
+                pdf_data,
                 "application/pdf",
             )
         },
@@ -275,6 +289,15 @@ def test_document_lifecycle_upload_query_and_delete(client):
     assert document.subject_id == subject_id
     assert document.status == "INDEXED"
     assert document.indexed_at is not None
+    assert document.source_uri is not None
+    assert Path(document.source_uri).exists()
+    assert Path(document.source_uri).name == (
+        f"{payload['document_id']}_lesson.pdf"
+    )
+    assert document.content_sha256 == (
+        sha256(pdf_data).hexdigest()
+    )
+    assert document.file_size_bytes == len(pdf_data)
 
     indexed = (
         client.app.state.vector_store.collection.get(
