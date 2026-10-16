@@ -20,3 +20,7 @@ logs/
 .vscode/
 .DS_Store
 
+# Local data and private working documents outside the published application
+data/
+personal-docs/
+chroma_db_before_subject_backfill/
