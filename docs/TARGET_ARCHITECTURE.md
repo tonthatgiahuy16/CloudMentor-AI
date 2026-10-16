@@ -14,6 +14,8 @@
 > Planned components are not current implementation claims.
 > See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for the verified baseline.
 
+The product purpose and expected outcomes are in [`PROJECT_GOALS.md`](./PROJECT_GOALS.md). This design adapts the August 2026 *CloudMentor_AI_Final_Target_Architecture.docx* to the later implementation baseline; phase numbering follows the current repository rather than the older ten-step estimate in that document.
+
 ## 1. Project Overview
 
 CloudMentor AI is designed as an end-to-end learning data platform, not merely a PDF chatbot.
@@ -54,7 +56,9 @@ flowchart TB
 
     API --> DU[Document Upload]
     DU --> FS[(Source File Storage)]
-    DU --> KDE[Kafka: Document Events]
+    DU --> DP[Direct Processing]
+    DP --> EX[Extract]
+    DU -. future when justified .-> KDE[Kafka: Document Events]
     KDE --> IC[Ingestion Consumer]
 
     IC --> EX[Extract]
@@ -90,9 +94,13 @@ flowchart TB
 **Document ingestion**
 
 ```text
-Upload -> Store source file -> Publish document event
+Upload -> Store source file -> Direct processing
        -> Extract -> Transform -> Chunk -> Embed -> Index
        -> PostgreSQL registry/lifecycle + Chroma vector index
+
+Future asynchronous path when justified:
+Upload -> Store source file -> Publish document event
+       -> Consumer -> Extract -> Transform -> Chunk -> Embed -> Index
 ```
 
 **RAG serving**
@@ -119,6 +127,55 @@ The following capabilities apply across all flows:
 - Data Lineage
 - Identity and metadata propagation
 - Lifecycle and failure management
+
+### Component responsibility map
+
+This is the **target** responsibility map from the approved architecture report, condensed for use during implementation. Presence in this table does not mean that a component exists in the current application.
+
+| Area | Component | Responsibility and intended output |
+| --- | --- | --- |
+| Experience | 1. Frontend | Collect upload, subject, question, quiz, and progress actions; render responses. |
+| Experience | 2. FastAPI API layer | Validate requests and route them to services; return stable response contracts. |
+| Control | 3. PostgreSQL subject registry | Own subject identity and metadata used for data scoping. |
+| Control | 4. PostgreSQL document registry | Own document identity, lifecycle, timestamps, and failure metadata. |
+| Control | 5. Kafka document events | Carry document events to consumers when asynchronous processing is justified. |
+| Ingestion | 6. Extract | Convert supported source formats into raw document content. |
+| Ingestion | 7. Transform | Clean and normalize extracted text. |
+| Ingestion | 8. Chunk | Produce retrieval-sized text units with stable order and boundaries. |
+| Ingestion | 9. Metadata and identity | Propagate document, chunk, subject, page, source, and version references. |
+| Ingestion | 10. Embedding | Produce document and query vectors with a known model version. |
+| Ingestion | 11. Index | Persist text, metadata, and vectors under stable record identities. |
+| Ingestion | 12. Chroma | Serve similarity search and metadata filtering as a derived index. |
+| RAG read path | 13. Retriever | Select relevant chunks within the requested scope. |
+| RAG read path | 14. Read-path lineage | Preserve chunk, document, page, and source references through retrieval. |
+| RAG read path | 15. Answer generator | Generate an answer from controlled retrieved context. |
+| RAG read path | 16. Chat API response | Return the answer with references that users can inspect. |
+| Lifecycle | 17. Document lifecycle | Record processing, failure, retry, and deletion state in PostgreSQL. |
+| Lifecycle | 18. Delete by `document_id` | Remove all derived records for one document without filename matching. |
+| Learning | 19. Quiz module | Own structured quizzes, questions, and answers in PostgreSQL. |
+| Learning | 20. User attempts | Record answers, correctness, score, topic, and timestamp. |
+| Learning | 21. Kafka learning events | Transport learning events when downstream decoupling is justified. |
+| Analytics | 22. Spark batch | Build curated historical datasets when distributed processing is needed. |
+| Analytics | 23. Spark Structured Streaming | Build continuous aggregates or features when latency requirements justify it. |
+| Analytics | 24. Analytics layer | Produce progress, weak-topic, and quiz-difficulty measures. |
+| ML | 25. Feature engineering | Create traceable and versioned model inputs from curated data. |
+| ML | 26. Model training | Train and evaluate a model against an explicit baseline. |
+| ML | 27. Model inference | Produce versioned predictions or rankings for application use. |
+| ML | 28. Personalization | Choose a next learning activity using measured evidence. |
+| Platform | 29. Observability | Expose lifecycle state, logs, metrics, health, and failure signals. |
+| Platform | 30. Data quality | Check schema, completeness, duplicates, and cross-store consistency. |
+| Platform | 31. Data lineage | Trace source-to-answer and attempt-to-recommendation paths. |
+
+### Identity, lineage, and quality contracts
+
+| Path | Identity that must survive | Checkable outcome |
+| --- | --- | --- |
+| Write | `source_uri` or retained file reference → `document_id` → `chunk_id` or `chunk_index` → index record | A retry, delete, or rebuild can select the intended document and all of its derived records. |
+| Read | question and scope → retrieved `chunk_id` → `document_id`, page, source → answer | An answer's cited material can be inspected and its scope checked. |
+| Learning | `user_id` → `attempt_id`, question, topic, score, time → event → aggregate → feature → model version | A recommendation can be traced back to the learning records and transformation that produced it. |
+| Lifecycle | `document_id` → state transition, processing time, failure stage, retry and delete or rebuild action | An operator can identify what failed, what was affected, and how to resume safely. |
+
+Stage boundaries need schema and required-field checks; content checks should catch empty text, missing metadata, and duplicates. Operational signals should include processing duration, throughput, failure counts, retrieval results, and event lag when event processing is introduced. These are design requirements; implementation and test coverage belong in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
 
 ## 3. Business Value
 
@@ -201,12 +258,12 @@ Current setup and test instructions live in the repository [`README`](../README.
 
 | Phase | Status | Completion boundary |
 | --- | --- | --- |
-| Phase 1 — Core Data Foundation and RAG | In progress | Manual local end-to-end workflow verified; automated reproducibility and recovery hardening remain |
-| Phase 2 — Reliability and Multi-source Ingestion | Planned | Starts after Phase 1 verification boundary is met |
-| Phase 3 — Quiz and Learning Application | Planned | — |
-| Phase 4 — Event-driven Processing with Kafka | Planned | — |
-| Phase 5 — Distributed Analytics with Spark | Planned | — |
-| Phase 6 — Machine Learning and Personalization | Planned | — |
+| Phase 1 — Core Data Foundation and RAG | In progress | Reproducible document upload → indexed state → scoped answer with source → delete; stable identity and stage contracts; automated coverage for the full local lifecycle. Manual verification alone is recorded separately. |
+| Phase 2 — Reliability and Multi-source Ingestion | Planned | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, idempotency, cross-store reconciliation, and tested delete/rebuild recovery. PostgreSQL registry work already present in the baseline is not counted as new work. |
+| Phase 3 — Quiz and Learning Application | Planned | Users, quizzes, questions, attempts, answers, scores, and progress create complete, queryable learning records linked to their subject or topic. |
+| Phase 4 — Event-driven Processing with Kafka | Planned | A documented workload justifies asynchronous processing; versioned events can be replayed, consumers handle duplicates and failures, and upload latency or independent scaling is measured. |
+| Phase 5 — Distributed Analytics with Spark | Planned | Batch or streaming jobs produce validated curated datasets and versioned features with lineage; scale or latency benefit is measured against a simpler baseline. |
+| Phase 6 — Machine Learning and Personalization | Planned | Predictions or rankings are evaluated against a baseline, tied to data and model versions, and shown to improve a defined learning outcome before improvement is claimed. |
 
 Phases are promoted from planned to implemented only when the corresponding code, tests, and reproducible evidence exist in the application repository.
 

@@ -7,10 +7,10 @@ This document records the implementation status of CloudMentor AI at a specific 
 | Field | Value |
 | --- | --- |
 | Snapshot date | 2026-10-07 |
-| Application baseline | [`89fd45d`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/89fd45dda10212c866f7baaa4ea85d0b00e37e46) |
+| Application baseline | `89fd45dda10212c866f7baaa4ea85d0b00e37e46` |
 | Current milestone | Subject-scoped local RAG vertical slice |
 | Overall state | Core workflow and manual local end-to-end scenario verified; automation, recovery, and evaluation hardening remain |
-| CI evidence | [GitHub Actions run 37422895674](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/runs/37422895674) |
+| CI evidence | GitHub Actions run `37422895674` |
 
 The status was captured against `main` at `89fd45d` before this update receives its own commit.
 
@@ -114,7 +114,7 @@ Update this document when a milestone changes, a limitation is removed, or new v
 
 - the snapshot date;
 - the application commit or release being described;
-- links to reproducible CI or test evidence;
+- links or stable identifiers for reproducible CI or test evidence;
 - capabilities added or removed;
 - known limitations that changed;
 - the next milestone priorities.
