@@ -17,4 +17,5 @@ python_files = [
   "test_subject_repository.py",
   "test_subject_api.py",
   "test_chat_api.py",
+  "test_document_lifecycle_e2e.py",
 ]
