@@ -1,4 +1,5 @@
 import os
+from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
@@ -132,6 +133,9 @@ async def upload_pdf(
         / f"{document_id}_{original_name}"
     )
 
+    source_uri = save_path.as_posix()
+    content_sha256 = sha256(data).hexdigest()
+    file_size_bytes = len(data)
     save_path.write_bytes(data)
 
     try:
@@ -141,11 +145,12 @@ async def upload_pdf(
             chapter=chapter,
             document_id=document_id,
             original_filename=original_name,
+            source_uri=source_uri,
+            content_sha256=content_sha256,
+            file_size_bytes=file_size_bytes,
         )
 
     except Exception as exc:
-        save_path.unlink(missing_ok=True)
-
         raise HTTPException(
             status_code=500,
             detail="PDF processing failed",

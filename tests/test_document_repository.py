@@ -122,6 +122,7 @@ def test_mark_deleted_raises_when_document_missing(
             str(uuid4())
         )
 
+
 def test_list_active_excludes_deleted_documents(
     repository,
     document,
@@ -144,3 +145,34 @@ def test_list_active_excludes_deleted_documents(
         result.document_id
         for result in results
     } == {active_document.document_id}
+
+
+def test_create_persists_source_metadata(
+    db_session,
+    repository,
+):
+    subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+
+    db_session.add(subject)
+    db_session.commit()
+    db_session.refresh(subject)
+
+    result = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject.subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri="storage/uploads/document-id_lesson.pdf",
+        content_sha256="a" * 64,
+        file_size_bytes=2048,
+    )
+
+    assert result.source_uri == (
+        "storage/uploads/document-id_lesson.pdf"
+    )
+    assert result.content_sha256 == "a" * 64
+    assert result.file_size_bytes == 2048
