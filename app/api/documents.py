@@ -74,7 +74,11 @@ def get_document(
     document_id: str,
     document_repo=Depends(get_document_repository),
 ):
-    document = document_repo.get_by_id(document_id)
+    document = (
+        document_repo.get_visible_by_id(
+            document_id
+            )
+    )
 
     if (
         document is None

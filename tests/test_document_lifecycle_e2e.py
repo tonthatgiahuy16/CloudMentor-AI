@@ -22,6 +22,7 @@ from app.rag.vector_store import VectorStore
 from app.api.upload import (
     get_pdf_service,
     get_upload_dir,
+    get_upload_subject_repository,
     router as upload_router,
 )
 from app.models.chunk import Chunk
@@ -29,6 +30,7 @@ from app.repos.document_repository import DocumentRepository
 
 from app.api.chat import (
     get_chat_service,
+    get_chat_subject_repository,
     router as chat_router,
 )
 from app.rag.retriever import Retriever
@@ -275,6 +277,18 @@ def client(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_subject_repository] = (
         lambda: SubjectRepository(db_session)
+    )
+
+    app.dependency_overrides[
+        get_upload_subject_repository
+    ] = lambda: SubjectRepository(
+        db_session
+    )
+
+    app.dependency_overrides[
+        get_chat_subject_repository
+    ] = lambda: SubjectRepository(
+        db_session
     )
 
     try:

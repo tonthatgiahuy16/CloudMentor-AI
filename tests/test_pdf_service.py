@@ -285,3 +285,106 @@ def test_recover_stale_document_marks_missing_source_failed():
         ),
     )
     service.index.delete_by_document_id.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "UPLOADED",
+        "PROCESSING",
+        "FAILED",
+        "INDEXED",
+    ],
+)
+def test_rebuild_retained_document_accepts_non_deleted_statuses(
+    status,
+):
+    document = SimpleNamespace(
+        document_id="document-id",
+        status=status,
+    )
+
+    service = PDFService.__new__(
+        PDFService
+    )
+    service._reprocess_retained_document = Mock(
+        return_value=3
+    )
+
+    result = service.rebuild_retained_document(
+        document
+    )
+
+    assert result == 3
+    (
+        service
+        ._reprocess_retained_document
+        .assert_called_once_with(document)
+    )
+
+
+def test_rebuild_retained_document_rejects_deleted_document():
+    document = SimpleNamespace(
+        document_id="deleted-document-id",
+        status="DELETED",
+    )
+
+    service = PDFService.__new__(
+        PDFService
+    )
+    service._reprocess_retained_document = Mock()
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "Document cannot be rebuilt "
+            "from its current status"
+        ),
+    ):
+        service.rebuild_retained_document(
+            document
+        )
+
+    (
+        service
+        ._reprocess_retained_document
+        .assert_not_called()
+    )
+
+
+def test_rebuild_retained_document_marks_invalid_source_failed():
+    document = SimpleNamespace(
+        document_id="indexed-document-id",
+        subject_id="subject-id",
+        status="INDEXED",
+        source_uri=None,
+        content_sha256=None,
+        file_size_bytes=None,
+    )
+
+    service = PDFService.__new__(
+        PDFService
+    )
+    service.document_repo = Mock()
+    service.index = Mock()
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "Document source metadata "
+            "is incomplete"
+        ),
+    ):
+        service.rebuild_retained_document(
+            document
+        )
+
+    service.document_repo.mark_failed.assert_called_once_with(
+        document_id="indexed-document-id",
+        failed_stage="EXTRACT",
+        error_message=(
+            "Document source metadata "
+            "is incomplete"
+        ),
+    )
+    service.index.delete_by_document_id.assert_not_called()

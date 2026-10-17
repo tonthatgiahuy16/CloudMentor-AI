@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 from app.db_models.document import Document
 from datetime import datetime
+from app.db_models.subject import Subject
 
 PROCESSING_STAGES = {
     "EXTRACT",
@@ -21,6 +22,27 @@ class DocumentRepository:
         return (
             self.db.query(Document)
             .filter(Document.document_id == document_id)
+            .first()
+        )
+
+
+    def get_visible_by_id(
+        self,
+        document_id: str,
+    ) -> Document | None:
+        return (
+            self.db.query(Document)
+            .join(
+                Subject,
+                Subject.subject_id
+                == Document.subject_id,
+            )
+            .filter(
+                Document.document_id
+                == document_id,
+                Document.status != "DELETED",
+                Subject.status == "ACTIVE",
+            )
             .first()
         )
 
@@ -48,10 +70,38 @@ class DocumentRepository:
     def list_active(self) -> list[Document]:
         return (
             self.db.query(Document)
-            .filter(Document.status != "DELETED")
-            .order_by(Document.uploaded_at.desc())
+            .join(
+                Subject,
+                Subject.subject_id
+                == Document.subject_id,
+            )
+            .filter(
+                Document.status != "DELETED",
+                Subject.status == "ACTIVE",
+            )
+            .order_by(
+                Document.uploaded_at.desc()
+            )
             .all()
         )
+
+
+    def list_active_by_subject(
+        self,
+        subject_id: str,
+    ) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .filter(
+                Document.subject_id == subject_id,
+                Document.status != "DELETED",
+            )
+            .order_by(
+                Document.uploaded_at.desc()
+            )
+            .all()
+        )
+
 
     def list_stale_ingestions(
         self,

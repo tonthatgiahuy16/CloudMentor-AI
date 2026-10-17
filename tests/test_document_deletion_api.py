@@ -96,7 +96,10 @@ class FakeDocumentRepository:
             if document.status != "DELETED"
         ]
 
-    def get_by_id(self, document_id):
+    def get_visible_by_id(
+        self,
+        document_id,
+    ):
         for document in self.documents:
             if document.document_id == document_id:
                 return document
