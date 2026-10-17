@@ -877,3 +877,121 @@ def test_get_visible_by_id_requires_active_subject(
         == document.document_id
     )
     assert hidden_result is None
+
+
+def test_list_indexed_for_active_subjects_filters_lifecycle(
+    db_session,
+    repository,
+    document,
+):
+    indexed_active = repository.mark_indexed(
+        document.document_id
+    )
+
+    repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="uploaded.pdf",
+        file_type="pdf",
+        chapter=2,
+    )
+
+    deleted_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="deleted.pdf",
+        file_type="pdf",
+        chapter=3,
+    )
+    repository.mark_indexed(
+        deleted_document.document_id
+    )
+    repository.mark_deleted(
+        deleted_document.document_id
+    )
+
+    trashed_subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Trashed {uuid4()}",
+        status="DELETED",
+    )
+    db_session.add(trashed_subject)
+    db_session.commit()
+
+    indexed_in_trash = repository.create(
+        document_id=str(uuid4()),
+        subject_id=trashed_subject.subject_id,
+        filename="trashed.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+    repository.mark_indexed(
+        indexed_in_trash.document_id
+    )
+
+    results = (
+        repository
+        .list_indexed_for_active_subjects()
+    )
+
+    assert [
+        result.document_id
+        for result in results
+    ] == [indexed_active.document_id]
+
+
+def test_list_reconciliation_records_includes_all_lifecycle_states(
+    db_session,
+    repository,
+    document,
+):
+    document.status = "FAILED"
+
+    trashed_subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Trashed {uuid4()}",
+        status="DELETED",
+    )
+    db_session.add(trashed_subject)
+    db_session.commit()
+
+    indexed_in_trash = repository.create(
+        document_id=str(uuid4()),
+        subject_id=trashed_subject.subject_id,
+        filename="trashed.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+    indexed_in_trash.status = "INDEXED"
+
+    db_session.commit()
+
+    records = (
+        repository
+        .list_reconciliation_records()
+    )
+
+    snapshots = {
+        (
+            record.document_id,
+            record.subject_id,
+            record.document_status,
+            record.subject_status,
+        )
+        for record in records
+    }
+
+    assert snapshots == {
+        (
+            document.document_id,
+            document.subject_id,
+            "FAILED",
+            "ACTIVE",
+        ),
+        (
+            indexed_in_trash.document_id,
+            trashed_subject.subject_id,
+            "INDEXED",
+            "DELETED",
+        ),
+    }

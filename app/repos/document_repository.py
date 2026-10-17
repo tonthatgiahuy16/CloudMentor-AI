@@ -1,7 +1,10 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, or_
-from app.db_models.document import Document
+from dataclasses import dataclass
 from datetime import datetime
+
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session
+
+from app.db_models.document import Document
 from app.db_models.subject import Subject
 
 PROCESSING_STAGES = {
@@ -11,6 +14,13 @@ PROCESSING_STAGES = {
     "EMBEDDING",
     "INDEX",
 }
+
+@dataclass(frozen=True)
+class DocumentReconciliationRecord:
+    document_id: str
+    subject_id: str
+    document_status: str
+    subject_status: str
 
 
 class DocumentRepository:
@@ -128,6 +138,65 @@ class DocumentRepository:
             )
             .all()
         )
+
+    def list_indexed_for_active_subjects(
+        self,
+    ) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .join(
+                Subject,
+                Subject.subject_id
+                == Document.subject_id,
+            )
+            .filter(
+                Document.status == "INDEXED",
+                Subject.status == "ACTIVE",
+            )
+            .order_by(
+                Document.document_id.asc()
+            )
+            .all()
+        )
+
+    def list_reconciliation_records(
+        self,
+    ) -> list[DocumentReconciliationRecord]:
+        rows = (
+            self.db.query(
+                Document.document_id,
+                Document.subject_id,
+                Document.status.label(
+                    "document_status"
+                ),
+                Subject.status.label(
+                    "subject_status"
+                ),
+            )
+            .join(
+                Subject,
+                Subject.subject_id
+                == Document.subject_id,
+            )
+            .order_by(
+                Document.document_id.asc()
+            )
+            .all()
+        )
+
+        return [
+            DocumentReconciliationRecord(
+                document_id=row.document_id,
+                subject_id=row.subject_id,
+                document_status=(
+                    row.document_status
+                ),
+                subject_status=(
+                    row.subject_status
+                ),
+            )
+            for row in rows
+        ]
 
 
     def list_active_by_subject(
