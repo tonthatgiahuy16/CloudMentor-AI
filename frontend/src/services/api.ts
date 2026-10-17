@@ -5,7 +5,12 @@ import type {
   UploadDocumentResult,
 } from '../types/document'
 
-import type { SubjectRecord } from '../types/subject'
+import type {
+  DeleteSubjectResult,
+  RestoreSubjectResult,
+  SubjectRecord,
+  SubjectTrashRecord,
+} from '../types/subject'
 
 import type { ChatResponse } from '../types/chat'
 
@@ -68,6 +73,26 @@ export async function getSubjects(): Promise<SubjectRecord[]> {
   return response.json()
 }
 
+export async function getSubjectTrash(): Promise<
+  SubjectTrashRecord[]
+> {
+  const response = await fetch(
+    `${API_BASE_URL}/subjects/trash`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tải danh sách môn học đã xóa',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+
 export async function createSubject(
   name: string,
 ): Promise<SubjectRecord> {
@@ -93,6 +118,53 @@ export async function createSubject(
 
   return response.json()
 }
+
+
+export async function deleteSubject(
+  subjectId: string,
+): Promise<DeleteSubjectResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/subjects/${encodeURIComponent(subjectId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể xóa môn học',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+
+export async function restoreSubject(
+  subjectId: string,
+): Promise<RestoreSubjectResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/subjects/${encodeURIComponent(subjectId)}/restore`,
+    {
+      method: 'POST',
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể phục hồi môn học',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
 
 export async function uploadDocument(
   input: UploadDocumentInput,
