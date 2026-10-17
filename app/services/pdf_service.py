@@ -2,12 +2,6 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from app.pipeline.chunk_pipeline import ChunkPipeline
-from app.pipeline.embedding_pipeline import EmbeddingPipeline
-from app.pipeline.extract_pipeline import ExtractPipeline
-from app.pipeline.index_pipeline import IndexPipeline
-from app.pipeline.transform_pipeline import TransformPipeline
-
 
 class RetainedSourceValidationError(
     RuntimeError
@@ -17,13 +11,26 @@ class RetainedSourceValidationError(
 
 class PDFService:
     def __init__(self, document_repo):
+        from app.pipeline.chunk_pipeline import (
+            ChunkPipeline,
+        )
+        from app.pipeline.embedding_pipeline import (
+            EmbeddingPipeline,
+        )
+        from app.pipeline.extract_pipeline import (
+            ExtractPipeline,
+        )
+        from app.pipeline.index_pipeline import (
+            IndexPipeline,
+        )
+        from app.pipeline.transform_pipeline import (
+            TransformPipeline,
+        )
+
         self.extract = ExtractPipeline()
         self.transform = TransformPipeline()
-
         self.chunk = ChunkPipeline()
-
         self.embedding = EmbeddingPipeline()
-
         self.index = IndexPipeline()
         self.document_repo = document_repo
 
