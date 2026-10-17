@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import ChatPanel from './components/ChatPanel'
+import SubjectLifecyclePanel from './components/SubjectLifecyclePanel'
 import UploadPanel from './components/UploadPanel'
 
 import {
@@ -28,8 +29,10 @@ function formatDate(value: string): string {
   }).format(new Date(value))
 }
 
+type ActivePage = 'documents' | 'subjects' | 'chat'
+
 function App() {
-  const [activePage, setActivePage] = useState<'documents' | 'chat'>(
+  const [activePage, setActivePage] = useState<ActivePage>(
     'documents',
   )
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
@@ -140,6 +143,14 @@ function App() {
             onClick={() => setActivePage('documents')}
           >
             Tài liệu
+          </button>
+          <button
+            className={`nav-item ${activePage === 'subjects' ? 'active' : ''}`}
+            type="button"
+            aria-current={activePage === 'subjects' ? 'page' : undefined}
+            onClick={() => setActivePage('subjects')}
+          >
+            Môn học
           </button>
           <button
             className={`nav-item ${activePage === 'chat' ? 'active' : ''}`}
@@ -280,6 +291,23 @@ function App() {
             </div>
           )}
         </section>
+          </>
+        ) : activePage === 'subjects' ? (
+          <>
+            <header className="page-header">
+              <div>
+                <span className="eyebrow">Knowledge workspace</span>
+                <h1>Quản lý môn học</h1>
+                <p>
+                  Kiểm soát dữ liệu đang hoạt động, thùng rác và
+                  khả năng khôi phục chỉ mục tìm kiếm.
+                </p>
+              </div>
+            </header>
+
+            <SubjectLifecyclePanel
+              onLifecycleChanged={refreshDocuments}
+            />
           </>
         ) : (
           <>
