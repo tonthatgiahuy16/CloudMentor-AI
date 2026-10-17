@@ -179,6 +179,113 @@ def test_create_persists_source_metadata(
     assert result.file_size_bytes == 2048
 
 
+def test_attach_source_metadata_to_legacy_document(
+    repository,
+    document,
+):
+    result = repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri=(
+            "storage/uploads/"
+            f"{document.document_id}_lesson.pdf"
+        ),
+        content_sha256="d" * 64,
+        file_size_bytes=1061675,
+    )
+
+    assert result.document_id == document.document_id
+    assert result.source_uri == (
+        "storage/uploads/"
+        f"{document.document_id}_lesson.pdf"
+    )
+    assert result.content_sha256 == "d" * 64
+    assert result.file_size_bytes == 1061675
+
+
+def test_attach_source_metadata_rejects_conflict(
+    repository,
+    document,
+):
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri="storage/uploads/original.pdf",
+        content_sha256="a" * 64,
+        file_size_bytes=100,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Document source metadata conflict",
+    ):
+        repository.attach_source_metadata(
+            document_id=document.document_id,
+            source_uri="storage/uploads/different.pdf",
+            content_sha256="b" * 64,
+            file_size_bytes=200,
+        )
+
+    persisted = repository.get_by_id(
+        document.document_id
+    )
+
+    assert persisted is not None
+    assert persisted.source_uri == (
+        "storage/uploads/original.pdf"
+    )
+    assert persisted.content_sha256 == "a" * 64
+    assert persisted.file_size_bytes == 100
+
+
+def test_attach_source_metadata_is_idempotent(
+    repository,
+    document,
+):
+    metadata = {
+        "document_id": document.document_id,
+        "source_uri": "storage/uploads/original.pdf",
+        "content_sha256": "a" * 64,
+        "file_size_bytes": 100,
+    }
+
+    first_result = repository.attach_source_metadata(
+        **metadata
+    )
+    second_result = repository.attach_source_metadata(
+        **metadata
+    )
+
+    assert first_result.document_id == document.document_id
+    assert second_result.document_id == document.document_id
+    assert second_result.source_uri == metadata["source_uri"]
+    assert (
+        second_result.content_sha256
+        == metadata["content_sha256"]
+    )
+    assert (
+        second_result.file_size_bytes
+        == metadata["file_size_bytes"]
+    )
+
+
+def test_attach_source_metadata_rejects_missing_document(
+    repository,
+):
+    missing_document_id = str(uuid4())
+
+    with pytest.raises(
+        RuntimeError,
+        match="Document not found",
+    ):
+        repository.attach_source_metadata(
+            document_id=missing_document_id,
+            source_uri="storage/uploads/missing.pdf",
+            content_sha256="a" * 64,
+            file_size_bytes=100,
+        )
+
+    assert repository.get_by_id(missing_document_id) is None
+
+
 def test_get_active_by_subject_and_sha256_returns_match(
     db_session,
     repository,
