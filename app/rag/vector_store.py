@@ -75,6 +75,39 @@ class VectorStore:
             f"Stored {len(chunks)} chunks into vector database"
         )
 
+    def list_all_records(
+        self,
+    ) -> list[dict]:
+        results = self.collection.get(
+            include=["metadatas"],
+        )
+
+        chunk_ids = results.get("ids") or []
+        metadatas = (
+            results.get("metadatas") or []
+        )
+
+        records = []
+
+        for index, chunk_id in enumerate(
+            chunk_ids
+        ):
+            metadata = (
+                metadatas[index]
+                if index < len(metadatas)
+                else None
+            )
+
+            record = (
+                dict(metadata)
+                if isinstance(metadata, dict)
+                else {}
+            )
+            record["chunk_id"] = chunk_id
+            records.append(record)
+
+        return records
+
     def delete_by_document_id(self, document_id: str):
         results = self.collection.get(
             where={"document_id": document_id},

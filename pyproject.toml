@@ -25,4 +25,7 @@ python_files = [
   "test_ingestion_recovery_service.py",
   "test_document_source_repair_service.py",
   "test_repair_document_source_script.py",
+  "test_postgres_chroma_reconciliation_service.py",
+  "test_vector_store_records.py",
+  "test_reconcile_postgres_chroma_script.py",
 ]
