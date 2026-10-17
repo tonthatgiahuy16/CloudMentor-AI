@@ -89,6 +89,34 @@ class PDFService:
             raise
 
 
+    def rebuild_retained_document(
+        self,
+        document,
+    ) -> int:
+        if document.status not in {
+            "UPLOADED",
+            "PROCESSING",
+            "FAILED",
+            "INDEXED",
+        }:
+            raise RuntimeError(
+                "Document cannot be rebuilt "
+                "from its current status"
+            )
+
+        try:
+            return self._reprocess_retained_document(
+                document
+            )
+        except RetainedSourceValidationError as exc:
+            self.document_repo.mark_failed(
+                document_id=document.document_id,
+                failed_stage="EXTRACT",
+                error_message=str(exc),
+            )
+            raise
+
+
     def _reprocess_retained_document(
         self,
         document,

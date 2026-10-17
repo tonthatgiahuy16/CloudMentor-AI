@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type {
+  DragEvent,
+  FormEvent,
+} from 'react'
 
 import {
   createSubject,
@@ -24,6 +27,7 @@ function UploadPanel({
   const [newSubjectName, setNewSubjectName] = useState('')
   const [chapter, setChapter] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true)
   const [isCreatingSubject, setIsCreatingSubject] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -96,6 +100,80 @@ function UploadPanel({
       setIsCreatingSubject(false)
     }
   }
+
+
+  function handleSelectedFile(
+    nextFile: File | null,
+  ) {
+    setError(null)
+    setSuccess(null)
+
+    if (nextFile === null) {
+      setFile(null)
+      return
+    }
+
+    if (
+      !nextFile.name
+        .toLowerCase()
+        .endsWith('.pdf')
+    ) {
+      setFile(null)
+      setError('Chỉ hỗ trợ file PDF')
+      return
+    }
+
+    if (nextFile.size > MAX_UPLOAD_BYTES) {
+      setFile(null)
+      setError(
+        'File PDF không được vượt quá 10 MB',
+      )
+      return
+    }
+
+    setFile(nextFile)
+  }
+
+
+  function handleDragOver(
+    event: DragEvent<HTMLLabelElement>,
+  ) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDragging(true)
+  }
+
+
+  function handleDragLeave(
+    event: DragEvent<HTMLLabelElement>,
+  ) {
+    event.preventDefault()
+    setIsDragging(false)
+  }
+
+
+  function handleDrop(
+    event: DragEvent<HTMLLabelElement>,
+  ) {
+    event.preventDefault()
+    setIsDragging(false)
+
+    const droppedFiles = event.dataTransfer.files
+
+    if (droppedFiles.length !== 1) {
+      setFile(null)
+      setError(
+        'Chỉ được tải một file PDF mỗi lần',
+      )
+      setSuccess(null)
+      return
+    }
+
+    handleSelectedFile(
+      droppedFiles[0] ?? null,
+    )
+  }
+
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -248,18 +326,31 @@ function UploadPanel({
           />
         </label>
 
-        <label className="file-field">
-          <span>{file ? file.name : 'Chọn file PDF'}</span>
-          <input
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null)
-              setError(null)
-              setSuccess(null)
-            }}
-          />
-        </label>
+<label
+  className={`file-field ${
+    isDragging ? 'is-dragging' : ''
+  }`}
+  onDragEnter={handleDragOver}
+  onDragOver={handleDragOver}
+  onDragLeave={handleDragLeave}
+  onDrop={handleDrop}
+>
+  <span>
+    {file
+      ? file.name
+      : 'Chọn hoặc kéo thả file PDF vào đây'}
+  </span>
+
+  <input
+    type="file"
+    accept=".pdf,application/pdf"
+    onChange={(event) => {
+      handleSelectedFile(
+        event.target.files?.[0] ?? null,
+      )
+    }}
+  />
+</label>
 
         <button
           className="primary-button"
@@ -288,5 +379,6 @@ function UploadPanel({
     </section>
   )
 }
+
 
 export default UploadPanel

@@ -7,9 +7,19 @@ from fastapi.testclient import TestClient
 from app.api.upload import (
     get_pdf_service,
     get_upload_dir,
+    get_upload_subject_repository,
     router,
 )
 
+
+class FakeSubjectRepository:
+    def __init__(self, subject):
+        self.subject = subject
+        self.calls = []
+
+    def get_by_id(self, subject_id):
+        self.calls.append(subject_id)
+        return self.subject
 
 
 class FakePDFService:
@@ -119,22 +129,39 @@ class FailingRetryPDFService(
             "Controlled retry failure"
         )
 
+DEFAULT_SUBJECT = object()
 
 def make_client(
     tmp_path,
     service=None,
+    subject=DEFAULT_SUBJECT,
 ):
     if service is None:
         service = FakePDFService()
 
+    if subject is DEFAULT_SUBJECT:
+        subject = SimpleNamespace(
+            subject_id="subject-active",
+            status="ACTIVE",
+        )
+
+    subject_repo = FakeSubjectRepository(
+        subject
+    )
+
     app = FastAPI()
     app.include_router(router)
+
     app.dependency_overrides[get_pdf_service] = (
         lambda: service
     )
     app.dependency_overrides[get_upload_dir] = (
         lambda: tmp_path
     )
+    app.dependency_overrides[
+        get_upload_subject_repository
+    ] = lambda: subject_repo
+
     return TestClient(app), service
 
 
@@ -362,3 +389,67 @@ def test_upload_returns_500_when_failed_document_retry_fails(
         service.existing_document
     ]
     assert list(tmp_path.iterdir()) == []
+
+
+def test_upload_rejects_subject_in_trash_before_writing(
+    tmp_path,
+):
+    subject = SimpleNamespace(
+        subject_id="subject-deleted",
+        status="DELETED",
+    )
+    client, service = make_client(
+        tmp_path,
+        subject=subject,
+    )
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.pdf",
+                b"%PDF-1.4\ncontent",
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": "subject-deleted"
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Subject is not active"
+    }
+    assert service.calls == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_upload_rejects_missing_subject_before_writing(
+    tmp_path,
+):
+    client, service = make_client(
+        tmp_path,
+        subject=None,
+    )
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.pdf",
+                b"%PDF-1.4\ncontent",
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": "missing-subject"
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Subject not found"
+    }
+    assert service.calls == []
+    assert not list(tmp_path.iterdir())

@@ -5,8 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class ChatRequest(BaseModel):
     question: Annotated[str, Field(min_length=1, max_length=2_000)]
-    subject_id: str | None = Field(
-        default=None,
+    subject_id: str = Field(
         min_length=1,
         max_length=100,
     )
@@ -25,15 +24,14 @@ class ChatRequest(BaseModel):
     @classmethod
     def subject_id_must_contain_text(
         cls,
-        value: str | None,
-    ) -> str | None:
-        if value is None:
-            return None
-
+        value: str,
+    ) -> str:
         normalized = value.strip()
 
         if not normalized:
-            raise ValueError("subject_id must not be empty")
+            raise ValueError(
+                "subject_id must not be empty"
+            )
 
         return normalized
 

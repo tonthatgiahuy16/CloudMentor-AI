@@ -16,7 +16,9 @@ from fastapi import (
 
 from app.core.database import SessionLocal
 from app.repos.document_repository import DocumentRepository
-
+from app.repos.subject_repository import (
+    SubjectRepository,
+)
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
@@ -41,6 +43,15 @@ def get_pdf_service():
         document_repo = DocumentRepository(db)
         yield PDFService(document_repo)
 
+    finally:
+        db.close()
+
+
+def get_upload_subject_repository():
+    db = SessionLocal()
+
+    try:
+        yield SubjectRepository(db)
     finally:
         db.close()
 
@@ -114,7 +125,26 @@ async def upload_pdf(
     chapter: int | None = Form(None),
     pdf_service=Depends(get_pdf_service),
     upload_dir: Path = Depends(get_upload_dir),
+    subject_repo=Depends(
+        get_upload_subject_repository
+    ),
 ):
+    subject = subject_repo.get_by_id(
+        subject_id
+    )
+
+    if subject is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not found",
+        )
+
+    if subject.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Subject is not active",
+        )
+
     data = await file.read(MAX_UPLOAD_BYTES + 1)
 
     original_name = validate_pdf_upload(

@@ -645,3 +645,128 @@ def test_list_stale_ingestions_excludes_other_statuses(
     )
 
     assert result == []
+
+
+def test_list_active_by_subject_is_scoped_and_excludes_deleted(
+    db_session,
+    repository,
+):
+    subject_a = Subject(
+        subject_id=str(uuid4()),
+        name="Data Engineering",
+    )
+    subject_b = Subject(
+        subject_id=str(uuid4()),
+        name="Cloud Computing",
+    )
+
+    db_session.add_all([
+        subject_a,
+        subject_b,
+    ])
+    db_session.commit()
+
+    active_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject_a.subject_id,
+        filename="active.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+    deleted_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject_a.subject_id,
+        filename="deleted.pdf",
+        file_type="pdf",
+        chapter=2,
+    )
+    repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject_b.subject_id,
+        filename="other-subject.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+
+    repository.mark_deleted(
+        deleted_document.document_id
+    )
+
+    result = repository.list_active_by_subject(
+        subject_a.subject_id
+    )
+
+    assert [
+        item.document_id
+        for item in result
+    ] == [active_document.document_id]
+
+
+def test_list_active_excludes_documents_from_inactive_subjects(
+    db_session,
+    repository,
+    document,
+):
+    deleted_subject = Subject(
+        subject_id=str(uuid4()),
+        name="Deleted Subject",
+        status="DELETED",
+    )
+
+    db_session.add(deleted_subject)
+    db_session.commit()
+
+    hidden_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=deleted_subject.subject_id,
+        filename="hidden.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+
+    result = repository.list_active()
+
+    result_ids = [
+        item.document_id
+        for item in result
+    ]
+
+    assert document.document_id in result_ids
+    assert hidden_document.document_id not in result_ids
+
+
+def test_get_visible_by_id_requires_active_subject(
+    db_session,
+    repository,
+    document,
+):
+    deleted_subject = Subject(
+        subject_id=str(uuid4()),
+        name="Deleted Subject Detail",
+        status="DELETED",
+    )
+
+    db_session.add(deleted_subject)
+    db_session.commit()
+
+    hidden_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=deleted_subject.subject_id,
+        filename="hidden-detail.pdf",
+        file_type="pdf",
+        chapter=1,
+    )
+
+    visible_result = repository.get_visible_by_id(
+        document.document_id
+    )
+    hidden_result = repository.get_visible_by_id(
+        hidden_document.document_id
+    )
+
+    assert visible_result is not None
+    assert (
+        visible_result.document_id
+        == document.document_id
+    )
+    assert hidden_result is None
