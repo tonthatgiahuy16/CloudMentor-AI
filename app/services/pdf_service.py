@@ -9,6 +9,12 @@ from app.pipeline.index_pipeline import IndexPipeline
 from app.pipeline.transform_pipeline import TransformPipeline
 
 
+class RetainedSourceValidationError(
+    RuntimeError
+):
+    pass
+
+
 class PDFService:
     def __init__(self, document_repo):
         self.extract = ExtractPipeline()
@@ -45,36 +51,42 @@ class PDFService:
                 "Only failed documents can be retried"
             )
 
-        if (
-            document.source_uri is None
-            or document.content_sha256 is None
-            or document.file_size_bytes is None
-        ):
+        return self._reprocess_retained_document(
+            document
+        )
+
+
+    def recover_stale_document(
+        self,
+        document,
+    ) -> int:
+        if document.status not in {
+            "UPLOADED",
+            "PROCESSING",
+        }:
             raise RuntimeError(
-                "Document source metadata is incomplete"
+                "Only stale uploaded or processing "
+                "documents can be recovered"
             )
 
-        source_path = Path(document.source_uri)
-
-        if not source_path.is_file():
-            raise RuntimeError(
-                "Retained source file is missing"
+        try:
+            return self._reprocess_retained_document(
+                document
             )
-
-        source_data = source_path.read_bytes()
-
-        if len(source_data) != document.file_size_bytes:
-            raise RuntimeError(
-                "Retained source file size does not match"
+        except RetainedSourceValidationError as exc:
+            self.document_repo.mark_failed(
+                document_id=document.document_id,
+                failed_stage="EXTRACT",
+                error_message=str(exc),
             )
+            raise
 
-        if (
-            sha256(source_data).hexdigest()
-            != document.content_sha256
-        ):
-            raise RuntimeError(
-                "Retained source checksum does not match"
-            )
+
+    def _reprocess_retained_document(
+        self,
+        document,
+    ) -> int:
+        self._validate_retained_source(document)
 
         self.index.delete_by_document_id(
             document.document_id
@@ -85,6 +97,42 @@ class PDFService:
             document_id=document.document_id,
             subject_id=document.subject_id,
         )
+
+
+    def _validate_retained_source(
+        self,
+        document,
+    ) -> None:
+        if (
+            document.source_uri is None
+            or document.content_sha256 is None
+            or document.file_size_bytes is None
+        ):
+            raise RetainedSourceValidationError(
+                "Document source metadata is incomplete"
+            )
+
+        source_path = Path(document.source_uri)
+
+        if not source_path.is_file():
+            raise RetainedSourceValidationError(
+                "Retained source file is missing"
+            )
+
+        source_data = source_path.read_bytes()
+
+        if len(source_data) != document.file_size_bytes:
+            raise RetainedSourceValidationError(
+                "Retained source file size does not match"
+            )
+
+        if (
+            sha256(source_data).hexdigest()
+            != document.content_sha256
+        ):
+            raise RetainedSourceValidationError(
+                "Retained source checksum does not match"
+            )
 
 
     def upload(
@@ -136,7 +184,10 @@ class PDFService:
 
         try:
             stage = "EXTRACT"
-
+            self.document_repo.record_processing_heartbeat(
+                document_id=document_id,
+                stage=stage,
+            )
             documents = self.extract.run(
                 file_path,
                 document_id,
@@ -144,21 +195,37 @@ class PDFService:
             )
 
             stage = "TRANSFORM"
+            self.document_repo.record_processing_heartbeat(
+                document_id=document_id,
+                stage=stage,
+            )
             cleaned = self.transform.run(
                 documents
             )
 
             stage = "CHUNK"
+            self.document_repo.record_processing_heartbeat(
+                document_id=document_id,
+                stage=stage,
+            )
             chunks = self.chunk.run(
                 cleaned
             )
 
             stage = "EMBEDDING"
+            self.document_repo.record_processing_heartbeat(
+                document_id=document_id,
+                stage=stage,
+            )
             embeddings = self.embedding.run(
                 chunks
             )
 
             stage = "INDEX"
+            self.document_repo.record_processing_heartbeat(
+                document_id=document_id,
+                stage=stage,
+            )
             self.index.run(
                 chunks,
                 embeddings,

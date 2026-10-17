@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -336,3 +337,311 @@ def test_mark_processing_clears_previous_failure(
     assert result.status == "PROCESSING"
     assert result.failed_stage is None
     assert result.error_message is None
+
+
+def test_mark_processing_records_attempt_metadata(
+    repository,
+    document,
+):
+    result = repository.mark_processing(
+        document.document_id
+    )
+
+    assert result.status == "PROCESSING"
+    assert result.processing_attempt_count == 1
+    assert result.last_processing_started_at is not None
+    assert result.last_processing_heartbeat_at is not None
+
+
+def test_record_processing_heartbeat_updates_current_stage(
+    repository,
+    document,
+):
+    processing = repository.mark_processing(
+        document.document_id
+    )
+
+    previous_heartbeat = (
+        processing.last_processing_heartbeat_at
+    )
+
+    result = (
+        repository.record_processing_heartbeat(
+            document_id=document.document_id,
+            stage="EXTRACT",
+        )
+    )
+
+    assert result.status == "PROCESSING"
+    assert result.current_stage == "EXTRACT"
+    assert (
+        result.last_processing_heartbeat_at
+        is not None
+    )
+    assert (
+        result.last_processing_heartbeat_at
+        >= previous_heartbeat
+    )
+
+
+def test_mark_failed_clears_current_processing_stage(
+    repository,
+    document,
+):
+    repository.mark_processing(
+        document.document_id
+    )
+    processing = (
+        repository.record_processing_heartbeat(
+            document_id=document.document_id,
+            stage="TRANSFORM",
+        )
+    )
+
+    previous_heartbeat = (
+        processing.last_processing_heartbeat_at
+    )
+
+    result = repository.mark_failed(
+        document_id=document.document_id,
+        failed_stage="TRANSFORM",
+        error_message="Controlled failure",
+    )
+
+    assert result.status == "FAILED"
+    assert result.current_stage is None
+    assert result.failed_stage == "TRANSFORM"
+    assert result.error_message == "Controlled failure"
+    assert (
+        result.last_processing_heartbeat_at
+        == previous_heartbeat
+    )
+
+
+def test_mark_indexed_clears_current_processing_stage(
+    repository,
+    document,
+):
+    repository.mark_processing(
+        document.document_id
+    )
+    repository.record_processing_heartbeat(
+        document_id=document.document_id,
+        stage="INDEX",
+    )
+
+    result = repository.mark_indexed(
+        document.document_id
+    )
+
+    assert result.status == "INDEXED"
+    assert result.current_stage is None
+    assert result.indexed_at is not None
+    assert result.failed_stage is None
+    assert result.error_message is None
+
+
+def test_mark_deleted_clears_current_processing_stage(
+    repository,
+    document,
+):
+    repository.mark_processing(
+        document.document_id
+    )
+    repository.record_processing_heartbeat(
+        document_id=document.document_id,
+        stage="CHUNK",
+    )
+
+    result = repository.mark_deleted(
+        document.document_id
+    )
+
+    assert result.status == "DELETED"
+    assert result.current_stage is None
+    assert result.deleted_at is not None
+
+
+def test_record_processing_heartbeat_rejects_invalid_stage(
+    repository,
+    document,
+):
+    repository.mark_processing(
+        document.document_id
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid processing stage",
+    ):
+        repository.record_processing_heartbeat(
+            document_id=document.document_id,
+            stage="LOAD",
+        )
+
+
+def test_record_processing_heartbeat_requires_processing_status(
+    repository,
+    document,
+):
+    with pytest.raises(
+        RuntimeError,
+        match="Document is not processing",
+    ):
+        repository.record_processing_heartbeat(
+            document_id=document.document_id,
+            stage="EXTRACT",
+        )
+
+    unchanged = repository.get_by_id(
+        document.document_id
+    )
+
+    assert unchanged.status == "UPLOADED"
+    assert unchanged.current_stage is None
+    assert (
+        unchanged.last_processing_heartbeat_at
+        is None
+    )
+
+
+def test_list_stale_ingestions_finds_expired_processing_document(
+    db_session,
+    repository,
+    document,
+):
+    now = datetime.now(timezone.utc)
+    stale_before = now - timedelta(minutes=15)
+
+    stale_document = repository.mark_processing(
+        document.document_id
+    )
+    stale_document.last_processing_heartbeat_at = (
+        now - timedelta(minutes=30)
+    )
+
+    fresh_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="fresh.pdf",
+        file_type="pdf",
+        chapter=2,
+    )
+    fresh_document = repository.mark_processing(
+        fresh_document.document_id
+    )
+    fresh_document.last_processing_heartbeat_at = (
+        now - timedelta(minutes=5)
+    )
+
+    db_session.commit()
+
+    result = repository.list_stale_ingestions(
+        stale_before=stale_before,
+    )
+
+    assert [
+        item.document_id
+        for item in result
+    ] == [stale_document.document_id]
+
+
+def test_list_stale_ingestions_finds_expired_uploaded_document(
+    db_session,
+    repository,
+    document,
+):
+    now = datetime.now(timezone.utc)
+    stale_before = now - timedelta(minutes=15)
+
+    document.uploaded_at = (
+        now - timedelta(minutes=30)
+    )
+
+    fresh_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="fresh-upload.pdf",
+        file_type="pdf",
+        chapter=2,
+    )
+    fresh_document.uploaded_at = (
+        now - timedelta(minutes=5)
+    )
+
+    db_session.commit()
+
+    result = repository.list_stale_ingestions(
+        stale_before=stale_before,
+    )
+
+    assert [
+        item.document_id
+        for item in result
+    ] == [document.document_id]
+
+
+def test_list_stale_ingestions_uses_start_time_when_heartbeat_missing(
+    db_session,
+    repository,
+    document,
+):
+    now = datetime.now(timezone.utc)
+    stale_before = now - timedelta(minutes=15)
+
+    processing = repository.mark_processing(
+        document.document_id
+    )
+    processing.last_processing_started_at = (
+        now - timedelta(minutes=30)
+    )
+    processing.last_processing_heartbeat_at = None
+
+    db_session.commit()
+
+    result = repository.list_stale_ingestions(
+        stale_before=stale_before,
+    )
+
+    assert [
+        item.document_id
+        for item in result
+    ] == [document.document_id]
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "FAILED",
+        "INDEXED",
+        "DELETED",
+    ],
+)
+def test_list_stale_ingestions_excludes_other_statuses(
+    db_session,
+    repository,
+    document,
+    status,
+):
+    now = datetime.now(timezone.utc)
+
+    document.status = status
+    document.uploaded_at = (
+        now - timedelta(hours=1)
+    )
+    document.last_processing_started_at = (
+        now - timedelta(hours=1)
+    )
+    document.last_processing_heartbeat_at = (
+        now - timedelta(hours=1)
+    )
+
+    db_session.commit()
+
+    result = repository.list_stale_ingestions(
+        stale_before=(
+            now - timedelta(minutes=15)
+        ),
+    )
+
+    assert result == []

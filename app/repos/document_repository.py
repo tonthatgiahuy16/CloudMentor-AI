@@ -1,6 +1,15 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from app.db_models.document import Document
+from datetime import datetime
+
+PROCESSING_STAGES = {
+    "EXTRACT",
+    "TRANSFORM",
+    "CHUNK",
+    "EMBEDDING",
+    "INDEX",
+}
 
 
 class DocumentRepository:
@@ -44,6 +53,43 @@ class DocumentRepository:
             .all()
         )
 
+    def list_stale_ingestions(
+        self,
+        stale_before: datetime,
+    ) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .filter(
+                or_(
+                    and_(
+                        Document.status == "UPLOADED",
+                        Document.uploaded_at
+                        <= stale_before,
+                    ),
+                    and_(
+                        Document.status == "PROCESSING",
+                        func.coalesce(
+                            Document
+                            .last_processing_heartbeat_at,
+                            Document
+                            .last_processing_started_at,
+                            Document.uploaded_at,
+                        ) <= stale_before,
+                    ),
+                )
+            )
+            .order_by(
+                func.coalesce(
+                    Document
+                    .last_processing_heartbeat_at,
+                    Document
+                    .last_processing_started_at,
+                    Document.uploaded_at,
+                ).asc()
+            )
+            .all()
+        )
+
 
     def mark_deleted(
         self,
@@ -58,6 +104,7 @@ class DocumentRepository:
             return document
 
         document.status = "DELETED"
+        document.current_stage = None
         document.deleted_at = func.now()
 
         self.db.commit()
@@ -76,8 +123,52 @@ class DocumentRepository:
             raise RuntimeError("Document not found")
 
         document.status = "PROCESSING"
+        document.processing_attempt_count = (
+            document.processing_attempt_count or 0
+        ) + 1
+        document.last_processing_started_at = (
+            func.now()
+        )
+        document.last_processing_heartbeat_at = (
+            func.now()
+        )
+
+        document.current_stage = None
         document.failed_stage = None
         document.error_message = None
+
+        self.db.commit()
+        self.db.refresh(document)
+
+        return document
+
+
+    def record_processing_heartbeat(
+        self,
+        document_id: str,
+        stage: str,
+    ) -> Document:
+        if stage not in PROCESSING_STAGES:
+            raise ValueError(
+                "Invalid processing stage"
+            )
+
+        document = self.get_by_id(document_id)
+
+        if document is None:
+            raise RuntimeError(
+                "Document not found"
+            )
+
+        if document.status != "PROCESSING":
+            raise RuntimeError(
+                "Document is not processing"
+            )
+
+        document.current_stage = stage
+        document.last_processing_heartbeat_at = (
+            func.now()
+        )
 
         self.db.commit()
         self.db.refresh(document)
@@ -94,8 +185,13 @@ class DocumentRepository:
 
         if document is None:
             raise RuntimeError("Document not found")
+
         document.status = "INDEXED"
+        document.current_stage = None
+        document.failed_stage = None
+        document.error_message = None
         document.indexed_at = func.now()
+
         self.db.commit()
         self.db.refresh(document)
         return document
@@ -117,6 +213,7 @@ class DocumentRepository:
             raise RuntimeError("Document not found")
 
         document.status = "FAILED"
+        document.current_stage = None
         document.failed_stage = failed_stage
         document.error_message = error_message
 
