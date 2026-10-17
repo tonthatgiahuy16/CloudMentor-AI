@@ -9,6 +9,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Response,
     UploadFile,
     status,
 )
@@ -107,6 +108,7 @@ def validate_pdf_upload(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_pdf(
+    response: Response,
     file: UploadFile = File(...),
     subject_id: str = Form(...),
     chapter: int | None = Form(None),
@@ -121,6 +123,56 @@ async def upload_pdf(
         data,
     )
 
+    content_sha256 = sha256(data).hexdigest()
+    file_size_bytes = len(data)
+
+    existing_document = (
+        pdf_service.find_active_duplicate(
+            subject_id=subject_id,
+            content_sha256=content_sha256,
+        )
+    )
+
+    if existing_document is not None:
+        if existing_document.status == "FAILED":
+            try:
+                total_chunks = (
+                    pdf_service.retry_failed_document(
+                        existing_document
+                    )
+                )
+
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="PDF retry failed",
+                ) from exc
+
+            response.status_code = (
+                status.HTTP_200_OK
+            )
+
+            return {
+                "document_id": (
+                    existing_document.document_id
+                ),
+                "filename": (
+                    existing_document.filename
+                ),
+                "chunks": total_chunks,
+            }
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "DOCUMENT_ALREADY_EXISTS",
+                "document_id": (
+                    existing_document.document_id
+                ),
+                "status": existing_document.status,
+            },
+        )
+
     document_id = str(uuid4())
 
     upload_dir.mkdir(
@@ -134,8 +186,6 @@ async def upload_pdf(
     )
 
     source_uri = save_path.as_posix()
-    content_sha256 = sha256(data).hexdigest()
-    file_size_bytes = len(data)
     save_path.write_bytes(data)
 
     try:

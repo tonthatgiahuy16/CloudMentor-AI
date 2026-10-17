@@ -176,3 +176,163 @@ def test_create_persists_source_metadata(
     )
     assert result.content_sha256 == "a" * 64
     assert result.file_size_bytes == 2048
+
+
+def test_get_active_by_subject_and_sha256_returns_match(
+    db_session,
+    repository,
+):
+    subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+
+    db_session.add(subject)
+    db_session.commit()
+    db_session.refresh(subject)
+
+    content_sha256 = "b" * 64
+
+    created = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject.subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri="storage/uploads/lesson.pdf",
+        content_sha256=content_sha256,
+        file_size_bytes=2048,
+    )
+
+    result = (
+        repository.get_active_by_subject_and_sha256(
+            subject_id=subject.subject_id,
+            content_sha256=content_sha256,
+        )
+    )
+
+    assert result is not None
+    assert result.document_id == created.document_id
+
+
+def test_get_active_by_subject_and_sha256_is_subject_scoped(
+    db_session,
+    repository,
+):
+    first_subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+    second_subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+
+    db_session.add_all([first_subject, second_subject])
+    db_session.commit()
+
+    content_sha256 = "c" * 64
+
+    repository.create(
+        document_id=str(uuid4()),
+        subject_id=first_subject.subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri="storage/uploads/lesson.pdf",
+        content_sha256=content_sha256,
+        file_size_bytes=2048,
+    )
+
+    result = repository.get_active_by_subject_and_sha256(
+        subject_id=second_subject.subject_id,
+        content_sha256=content_sha256,
+    )
+
+    assert result is None
+
+def test_get_active_by_subject_and_sha256_excludes_deleted(
+    db_session,
+    repository,
+):
+    subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+
+    db_session.add(subject)
+    db_session.commit()
+    db_session.refresh(subject)
+
+    content_sha256 = "d" * 64
+
+    created = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject.subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri="storage/uploads/lesson.pdf",
+        content_sha256=content_sha256,
+        file_size_bytes=2048,
+    )
+
+    repository.mark_deleted(created.document_id)
+
+    result = repository.get_active_by_subject_and_sha256(
+        subject_id=subject.subject_id,
+        content_sha256=content_sha256,
+    )
+
+    assert result is None
+
+
+def test_get_active_by_subject_and_sha256_requires_matching_hash(
+    db_session,
+    repository,
+):
+    subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+
+    db_session.add(subject)
+    db_session.commit()
+    db_session.refresh(subject)
+
+    repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject.subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri="storage/uploads/lesson.pdf",
+        content_sha256="e" * 64,
+        file_size_bytes=2048,
+    )
+
+    result = repository.get_active_by_subject_and_sha256(
+        subject_id=subject.subject_id,
+        content_sha256="f" * 64,
+    )
+
+    assert result is None
+
+
+def test_mark_processing_clears_previous_failure(
+    repository,
+    document,
+):
+    repository.mark_failed(
+        document_id=document.document_id,
+        failed_stage="EXTRACT",
+        error_message="Controlled extraction failure",
+    )
+
+    result = repository.mark_processing(
+        document.document_id
+    )
+
+    assert result.status == "PROCESSING"
+    assert result.failed_stage is None
+    assert result.error_message is None

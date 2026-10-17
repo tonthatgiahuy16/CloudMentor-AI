@@ -1,6 +1,6 @@
 from hashlib import sha256
 from pathlib import Path
-
+from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -11,9 +11,18 @@ from app.api.upload import (
 )
 
 
+
 class FakePDFService:
     def __init__(self):
         self.calls = []
+
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id,
+        content_sha256,
+    ):
+        return None
 
     def upload(
         self,
@@ -42,10 +51,72 @@ class FakePDFService:
         return 7
 
 
+class DuplicatePDFService(FakePDFService):
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id,
+        content_sha256,
+    ):
+        return SimpleNamespace(
+            document_id="existing-document-id",
+            filename="existing.pdf",
+            status="INDEXED",
+        )
+
+
+class FailedDocumentPDFService(FakePDFService):
+    def __init__(self):
+        super().__init__()
+        self.existing_document = SimpleNamespace(
+            document_id="failed-document-id",
+            filename="original.pdf",
+            status="FAILED",
+            source_uri="storage/uploads/failed-document.pdf",
+        )
+        self.retry_calls = []
+
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id,
+        content_sha256,
+    ):
+        return self.existing_document
+
+    def retry_failed_document(
+        self,
+        document,
+    ):
+        self.retry_calls.append(document)
+        return 5
+
+
 class FailingPDFService:
     def upload(self, *args, **kwargs):
         raise RuntimeError(
             "Controlled processing failure"
+        )
+
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id,
+        content_sha256,
+    ):
+        return None
+
+
+class FailingRetryPDFService(
+    FailedDocumentPDFService
+):
+    def retry_failed_document(
+        self,
+        document,
+    ):
+        self.retry_calls.append(document)
+        raise RuntimeError(
+            "Controlled retry failure"
         )
 
 
@@ -175,3 +246,119 @@ def test_upload_retains_valid_pdf_when_processing_fails(
 
     assert len(retained_files) == 1
     assert retained_files[0].read_bytes() == pdf_data
+
+
+def test_upload_rejects_active_duplicate_before_writing_file(
+    tmp_path,
+):
+    service = DuplicatePDFService()
+    client, _ = make_client(
+        tmp_path,
+        service=service,
+    )
+
+    pdf_data = b"%PDF-1.4\nduplicate content"
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "renamed-copy.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "code": "DOCUMENT_ALREADY_EXISTS",
+            "document_id": "existing-document-id",
+            "status": "INDEXED",
+        }
+    }
+    assert service.calls == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_upload_retries_failed_document_without_new_source_file(
+    tmp_path,
+):
+    service = FailedDocumentPDFService()
+    client, _ = make_client(
+        tmp_path,
+        service=service,
+    )
+
+    pdf_data = b"%PDF-1.4\nretryable content"
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "renamed-retry.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "document_id": "failed-document-id",
+        "filename": "original.pdf",
+        "chunks": 5,
+    }
+
+    assert service.calls == []
+    assert service.retry_calls == [
+        service.existing_document
+    ]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_upload_returns_500_when_failed_document_retry_fails(
+    tmp_path,
+):
+    service = FailingRetryPDFService()
+    client, _ = make_client(
+        tmp_path,
+        service=service,
+    )
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "retry.pdf",
+                b"%PDF-1.4\nretryable content",
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "PDF retry failed"
+    }
+    assert service.calls == []
+    assert service.retry_calls == [
+        service.existing_document
+    ]
+    assert list(tmp_path.iterdir()) == []

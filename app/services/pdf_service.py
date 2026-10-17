@@ -1,10 +1,13 @@
-from app.pipeline.extract_pipeline import ExtractPipeline
-from app.pipeline.transform_pipeline import TransformPipeline
+from hashlib import sha256
+from pathlib import Path
+from uuid import uuid4
+
 from app.pipeline.chunk_pipeline import ChunkPipeline
 from app.pipeline.embedding_pipeline import EmbeddingPipeline
+from app.pipeline.extract_pipeline import ExtractPipeline
 from app.pipeline.index_pipeline import IndexPipeline
-from uuid import uuid4
-from pathlib import Path
+from app.pipeline.transform_pipeline import TransformPipeline
+
 
 class PDFService:
     def __init__(self, document_repo):
@@ -19,6 +22,71 @@ class PDFService:
         self.document_repo = document_repo
 
 
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id: str,
+        content_sha256: str,
+    ):
+        return (
+            self.document_repo
+            .get_active_by_subject_and_sha256(
+                subject_id=subject_id,
+                content_sha256=content_sha256,
+            )
+        )
+
+    def retry_failed_document(
+        self,
+        document,
+    ) -> int:
+        if document.status != "FAILED":
+            raise RuntimeError(
+                "Only failed documents can be retried"
+            )
+
+        if (
+            document.source_uri is None
+            or document.content_sha256 is None
+            or document.file_size_bytes is None
+        ):
+            raise RuntimeError(
+                "Document source metadata is incomplete"
+            )
+
+        source_path = Path(document.source_uri)
+
+        if not source_path.is_file():
+            raise RuntimeError(
+                "Retained source file is missing"
+            )
+
+        source_data = source_path.read_bytes()
+
+        if len(source_data) != document.file_size_bytes:
+            raise RuntimeError(
+                "Retained source file size does not match"
+            )
+
+        if (
+            sha256(source_data).hexdigest()
+            != document.content_sha256
+        ):
+            raise RuntimeError(
+                "Retained source checksum does not match"
+            )
+
+        self.index.delete_by_document_id(
+            document.document_id
+        )
+
+        return self._process_document(
+            file_path=document.source_uri,
+            document_id=document.document_id,
+            subject_id=document.subject_id,
+        )
+
+
     def upload(
         self,
         file_path: str,
@@ -30,6 +98,7 @@ class PDFService:
         content_sha256: str | None = None,
         file_size_bytes: int | None = None,
         ):
+
         if document_id is None:
             document_id = str(uuid4())
 
@@ -47,7 +116,23 @@ class PDFService:
             content_sha256=content_sha256,
             file_size_bytes=file_size_bytes,
         )
-        self.document_repo.mark_processing(document_id)
+        return self._process_document(
+            file_path=file_path,
+            document_id=document_id,
+            subject_id=subject_id,
+        )
+
+
+    def _process_document(
+        self,
+        *,
+        file_path: str,
+        document_id: str,
+        subject_id: str,
+    ) -> int:
+        self.document_repo.mark_processing(
+            document_id
+        )
 
         try:
             stage = "EXTRACT"
@@ -59,30 +144,29 @@ class PDFService:
             )
 
             stage = "TRANSFORM"
-
             cleaned = self.transform.run(
                 documents
             )
 
             stage = "CHUNK"
-
             chunks = self.chunk.run(
                 cleaned
             )
 
             stage = "EMBEDDING"
-
             embeddings = self.embedding.run(
                 chunks
             )
 
             stage = "INDEX"
-
             self.index.run(
                 chunks,
-                embeddings
+                embeddings,
             )
-            self.document_repo.mark_indexed(document_id)
+
+            self.document_repo.mark_indexed(
+                document_id
+            )
 
             return len(chunks)
 
@@ -90,5 +174,6 @@ class PDFService:
             self.document_repo.mark_failed(
                 document_id=document_id,
                 failed_stage=stage,
-                error_message=str(exc))
+                error_message=str(exc),
+            )
             raise
