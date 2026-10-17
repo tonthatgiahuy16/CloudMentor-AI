@@ -15,6 +15,27 @@ class DocumentRepository:
             .first()
         )
 
+
+    def get_active_by_subject_and_sha256(
+        self,
+        subject_id: str,
+        content_sha256: str,
+    ) -> Document | None:
+        return (
+            self.db.query(Document)
+            .filter(
+                Document.subject_id == subject_id,
+                Document.content_sha256
+                == content_sha256,
+                Document.status != "DELETED",
+            )
+            .order_by(
+                Document.uploaded_at.desc()
+            )
+            .first()
+        )
+
+
     def list_active(self) -> list[Document]:
         return (
             self.db.query(Document)
@@ -22,6 +43,7 @@ class DocumentRepository:
             .order_by(Document.uploaded_at.desc())
             .all()
         )
+
 
     def mark_deleted(
         self,
@@ -44,19 +66,24 @@ class DocumentRepository:
         return document
 
 
-    def mark_processing(self, document_id: str):
-        document = (
-            self.db.query(Document)
-            .filter(Document.document_id == document_id)
-            .first()
-        )
+    def mark_processing(
+        self,
+        document_id: str,
+    ) -> Document:
+        document = self.get_by_id(document_id)
 
         if document is None:
             raise RuntimeError("Document not found")
+
         document.status = "PROCESSING"
+        document.failed_stage = None
+        document.error_message = None
+
         self.db.commit()
         self.db.refresh(document)
+
         return document
+
 
     def mark_indexed(self, document_id: str):
         document = (
@@ -72,6 +99,7 @@ class DocumentRepository:
         self.db.commit()
         self.db.refresh(document)
         return document
+
 
     def mark_failed(
             self,
@@ -96,6 +124,7 @@ class DocumentRepository:
         self.db.refresh(document)
 
         return document
+
 
     def create(
         self,

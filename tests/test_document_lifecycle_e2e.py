@@ -1,5 +1,6 @@
 from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -57,6 +58,20 @@ class LifecyclePDFService:
         self.document_repo = document_repo
         self.vector_store = vector_store
 
+    def find_active_duplicate(
+        self,
+        *,
+        subject_id,
+        content_sha256,
+    ):
+        return (
+            self.document_repo
+            .get_active_by_subject_and_sha256(
+                subject_id=subject_id,
+                content_sha256=content_sha256,
+            )
+        )
+
     def upload(
         self,
         path,
@@ -109,6 +124,54 @@ class LifecyclePDFService:
             embeddings,
         )
         self.document_repo.mark_indexed(document_id)
+
+        return 1
+
+    def retry_failed_document(
+        self,
+        document,
+    ):
+        pdf_path = Path(document.source_uri)
+
+        if not pdf_path.exists():
+            raise RuntimeError(
+                "Retained PDF does not exist"
+            )
+
+        self.vector_store.delete_by_document_id(
+            document.document_id
+        )
+
+        self.document_repo.mark_processing(
+            document.document_id
+        )
+
+        chunk = Chunk(
+            id=f"{document.document_id}:0",
+            document_id=document.document_id,
+            subject_id=document.subject_id,
+            chunk_index=0,
+            page=1,
+            source=document.filename,
+            text=(
+                "Cloud computing provides computing "
+                "resources on demand."
+            ),
+        )
+
+        embeddings = np.array(
+            [[1.0, 0.0, 0.0]],
+            dtype=np.float32,
+        )
+
+        self.vector_store.add(
+            [chunk],
+            embeddings,
+        )
+
+        self.document_repo.mark_indexed(
+            document.document_id
+        )
 
         return 1
 
@@ -393,3 +456,165 @@ def test_document_lifecycle_upload_query_and_delete(client):
         ),
         "sources": [],
     }
+
+
+def test_repeated_upload_does_not_create_duplicate_effects(
+    client,
+    tmp_path,
+):
+    pdf_data = b"%PDF-1.4\nsame document content"
+
+    subject_response = client.post(
+        "/subjects/",
+        json={"name": "Cloud Computing"},
+    )
+    subject_id = subject_response.json()["subject_id"]
+
+    first_response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": subject_id,
+            "chapter": "1",
+        },
+    )
+
+    assert first_response.status_code == 201
+    first_payload = first_response.json()
+
+    repeated_response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "renamed-copy.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": subject_id,
+            "chapter": "1",
+        },
+    )
+
+    assert repeated_response.status_code == 409
+    assert repeated_response.json() == {
+        "detail": {
+            "code": "DOCUMENT_ALREADY_EXISTS",
+            "document_id": first_payload["document_id"],
+            "status": "INDEXED",
+        }
+    }
+
+    active_documents = (
+        client.app.state.document_repo.list_active()
+    )
+
+    assert len(active_documents) == 1
+    assert (
+        active_documents[0].document_id
+        == first_payload["document_id"]
+    )
+
+    stored_pdfs = list(tmp_path.glob("*.pdf"))
+
+    assert len(stored_pdfs) == 1
+    assert stored_pdfs[0].name == (
+        f"{first_payload['document_id']}_lesson.pdf"
+    )
+
+    assert (
+        client.app.state.vector_store.collection.count()
+        == 1
+    )
+
+
+def test_failed_document_retry_reuses_source_and_identity(
+    client,
+    tmp_path,
+):
+    pdf_data = b"%PDF-1.4\nretryable lifecycle content"
+
+    subject_response = client.post(
+        "/subjects/",
+        json={"name": "Cloud Computing"},
+    )
+    subject_id = subject_response.json()["subject_id"]
+
+    document_id = str(uuid4())
+    source_path = (
+        tmp_path / f"{document_id}_lesson.pdf"
+    )
+    source_path.write_bytes(pdf_data)
+
+    repository = client.app.state.document_repo
+
+    repository.create(
+        document_id=document_id,
+        subject_id=subject_id,
+        filename="lesson.pdf",
+        file_type="pdf",
+        chapter=1,
+        source_uri=source_path.as_posix(),
+        content_sha256=sha256(
+            pdf_data
+        ).hexdigest(),
+        file_size_bytes=len(pdf_data),
+    )
+
+    repository.mark_failed(
+        document_id=document_id,
+        failed_stage="EXTRACT",
+        error_message="Controlled initial failure",
+    )
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "renamed-retry.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": subject_id,
+            "chapter": "1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "document_id": document_id,
+        "filename": "lesson.pdf",
+        "chunks": 1,
+    }
+
+    documents = repository.list_active()
+
+    assert len(documents) == 1
+    assert documents[0].document_id == document_id
+    assert documents[0].status == "INDEXED"
+    assert documents[0].failed_stage is None
+    assert documents[0].error_message is None
+    assert documents[0].source_uri == (
+        source_path.as_posix()
+    )
+
+    stored_pdfs = list(tmp_path.glob("*.pdf"))
+
+    assert stored_pdfs == [source_path]
+
+    indexed = (
+        client.app.state.vector_store.collection.get(
+            where={"document_id": document_id}
+        )
+    )
+
+    assert len(indexed["ids"]) == 1

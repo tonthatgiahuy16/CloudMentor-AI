@@ -19,3 +19,13 @@ class IndexPipeline:
         )
 
         return len(chunks)
+
+
+    def delete_by_document_id(
+        self,
+        document_id: str,
+    ) -> int:
+        return (
+            self.vector_store
+            .delete_by_document_id(document_id)
+        )
