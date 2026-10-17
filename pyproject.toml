@@ -23,4 +23,6 @@ python_files = [
   "test_index_pipeline.py",
   "test_pdf_service.py",
   "test_ingestion_recovery_service.py",
+  "test_document_source_repair_service.py",
+  "test_repair_document_source_script.py",
 ]

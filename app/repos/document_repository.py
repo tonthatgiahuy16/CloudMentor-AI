@@ -25,6 +25,50 @@ class DocumentRepository:
             .first()
         )
 
+    def attach_source_metadata(
+        self,
+        *,
+        document_id: str,
+        source_uri: str,
+        content_sha256: str,
+        file_size_bytes: int,
+    ) -> Document:
+        document = self.get_by_id(document_id)
+
+        if document is None:
+            raise RuntimeError("Document not found")
+
+        current_metadata = (
+            document.source_uri,
+            document.content_sha256,
+            document.file_size_bytes,
+        )
+        requested_metadata = (
+            source_uri,
+            content_sha256,
+            file_size_bytes,
+        )
+
+        if any(
+            value is not None
+            for value in current_metadata
+        ):
+            if current_metadata == requested_metadata:
+                return document
+
+            raise RuntimeError(
+                "Document source metadata conflict"
+            )
+
+
+        document.source_uri = source_uri
+        document.content_sha256 = content_sha256
+        document.file_size_bytes = file_size_bytes
+
+        self.db.commit()
+        self.db.refresh(document)
+
+        return document
 
     def get_visible_by_id(
         self,
