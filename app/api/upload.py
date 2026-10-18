@@ -1,6 +1,7 @@
 import os
 from hashlib import sha256
 from pathlib import Path
+from io import BytesIO
 from uuid import uuid4
 
 from fastapi import (
@@ -14,13 +15,14 @@ from fastapi import (
     status,
 )
 
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
 from app.core.database import SessionLocal
 from app.repos.document_repository import DocumentRepository
 from app.repos.subject_repository import (
     SubjectRepository,
 )
-
-from io import BytesIO
 
 from app.rag.loader import read_docx_paragraphs
 
@@ -84,6 +86,12 @@ def get_upload_dir() -> Path:
             "storage/uploads",
         )
     )
+
+
+def get_source_storage(
+    upload_dir: Path = Depends(get_upload_dir),
+) -> LocalSourceStorage:
+    return LocalSourceStorage(root=upload_dir)
 
 
 def validate_document_upload(
@@ -196,7 +204,7 @@ async def upload_document(
     subject_id: str = Form(...),
     chapter: int | None = Form(None),
     pdf_service=Depends(get_pdf_service),
-    upload_dir: Path = Depends(get_upload_dir),
+    source_storage=Depends(get_source_storage),
     subject_repo=Depends(
         get_upload_subject_repository
     ),
@@ -226,7 +234,6 @@ async def upload_document(
     )
 
     content_sha256 = sha256(data).hexdigest()
-    file_size_bytes = len(data)
 
     existing_document = (
         pdf_service.find_active_duplicate(
@@ -277,29 +284,22 @@ async def upload_document(
 
     document_id = str(uuid4())
 
-    upload_dir.mkdir(
-        parents=True,
-        exist_ok=True,
+    stored_source = source_storage.store(
+        document_id=document_id,
+        filename=original_name,
+        data=data,
     )
-
-    save_path = (
-        upload_dir
-        / f"{document_id}_{original_name}"
-    )
-
-    source_uri = save_path.as_posix()
-    save_path.write_bytes(data)
 
     try:
         total_chunks = pdf_service.upload(
-            str(save_path),
+            stored_source.source_uri,
             subject_id=subject_id,
             chapter=chapter,
             document_id=document_id,
             original_filename=original_name,
-            source_uri=source_uri,
-            content_sha256=content_sha256,
-            file_size_bytes=file_size_bytes,
+            source_uri=stored_source.source_uri,
+            content_sha256=stored_source.content_sha256,
+            file_size_bytes=stored_source.file_size_bytes,
         )
 
     except Exception as exc:

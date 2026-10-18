@@ -8,6 +8,9 @@ from app.pipeline.chunk_pipeline import ChunkPipeline
 from app.pipeline.extract_pipeline import ExtractPipeline
 from app.pipeline.transform_pipeline import TransformPipeline
 from app.rag.chunker import TextChunker
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
 
 from docx import Document as WordDocument
 
@@ -29,6 +32,9 @@ def test_retry_failed_document_reuses_source_and_document_id(
     )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = LocalSourceStorage(
+        root=tmp_path,
+    )
 
     service.document_repo = Mock()
     service.extract = Mock()
@@ -132,6 +138,9 @@ def test_retry_rejects_source_with_changed_content(
     )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = LocalSourceStorage(
+        root=tmp_path,
+    )
     service.document_repo = Mock()
 
     with pytest.raises(
@@ -208,6 +217,9 @@ def test_recover_stale_document_reuses_source_and_document_id(
     )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = LocalSourceStorage(
+        root=tmp_path,
+    )
     service.document_repo = Mock()
     service.index = Mock()
     service._process_document = Mock(
@@ -529,6 +541,9 @@ def test_rebuild_retained_txt_reuses_identity_and_lineage(
     )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = LocalSourceStorage(
+        root=tmp_path,
+    )
     service.document_repo = Mock()
     service.extract = ExtractPipeline()
     service.transform = TransformPipeline()
@@ -668,6 +683,9 @@ def test_rebuild_retained_docx_reuses_identity_and_lineage(
     )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = LocalSourceStorage(
+        root=tmp_path,
+    )
     service.document_repo = Mock()
     service.extract = ExtractPipeline()
     service.transform = TransformPipeline()
@@ -722,3 +740,90 @@ def test_rebuild_retained_docx_reuses_identity_and_lineage(
     service.document_repo.mark_indexed.assert_called_once_with(
         "document-1"
     )
+
+
+def test_rebuild_reads_retained_source_through_storage():
+    source_data = b"retained source"
+
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        status="INDEXED",
+        source_uri="source://document-1",
+        content_sha256=(
+            sha256(source_data).hexdigest()
+        ),
+        file_size_bytes=len(source_data),
+    )
+
+    source_storage = Mock()
+    source_storage.read_bytes.return_value = (
+        source_data
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.index = Mock()
+    service.source_storage = source_storage
+    service._process_document = Mock(
+        return_value=3
+    )
+
+    result = service.rebuild_retained_document(
+        document
+    )
+
+    assert result == 3
+    source_storage.read_bytes.assert_called_once_with(
+        "source://document-1"
+    )
+    service._process_document.assert_called_once_with(
+        file_path="source://document-1",
+        document_id="document-1",
+        subject_id="subject-1",
+    )
+
+
+def test_pdf_service_accepts_injected_source_storage(
+    monkeypatch,
+):
+    pipeline_classes = [
+        (
+            "app.pipeline.chunk_pipeline."
+            "ChunkPipeline"
+        ),
+        (
+            "app.pipeline.embedding_pipeline."
+            "EmbeddingPipeline"
+        ),
+        (
+            "app.pipeline.extract_pipeline."
+            "ExtractPipeline"
+        ),
+        (
+            "app.pipeline.index_pipeline."
+            "IndexPipeline"
+        ),
+        (
+            "app.pipeline.transform_pipeline."
+            "TransformPipeline"
+        ),
+    ]
+
+    for pipeline_class in pipeline_classes:
+        monkeypatch.setattr(
+            pipeline_class,
+            lambda: Mock(),
+        )
+
+    document_repo = Mock()
+    source_storage = Mock()
+
+    service = PDFService(
+        document_repo,
+        source_storage=source_storage,
+    )
+
+    assert service.document_repo is document_repo
+    assert service.source_storage is source_storage
