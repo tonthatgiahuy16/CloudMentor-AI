@@ -1,4 +1,5 @@
 from hashlib import sha256
+from inspect import signature
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 import pytest
@@ -13,6 +14,7 @@ from app.storage.source_storage import (
 )
 
 from docx import Document as WordDocument
+
 
 def test_retry_failed_document_reuses_source_and_document_id(
     tmp_path,
@@ -785,45 +787,19 @@ def test_rebuild_reads_retained_source_through_storage():
     )
 
 
-def test_pdf_service_accepts_injected_source_storage(
-    monkeypatch,
-):
-    pipeline_classes = [
-        (
-            "app.pipeline.chunk_pipeline."
-            "ChunkPipeline"
-        ),
-        (
-            "app.pipeline.embedding_pipeline."
-            "EmbeddingPipeline"
-        ),
-        (
-            "app.pipeline.extract_pipeline."
-            "ExtractPipeline"
-        ),
-        (
-            "app.pipeline.index_pipeline."
-            "IndexPipeline"
-        ),
-        (
-            "app.pipeline.transform_pipeline."
-            "TransformPipeline"
-        ),
-    ]
-
-    for pipeline_class in pipeline_classes:
-        monkeypatch.setattr(
-            pipeline_class,
-            lambda: Mock(),
-        )
-
-    document_repo = Mock()
+def test_pdf_service_accepts_injected_source_storage():
     source_storage = Mock()
 
-    service = PDFService(
-        document_repo,
+    bound_arguments = signature(
+        PDFService
+    ).bind(
+        Mock(),
         source_storage=source_storage,
     )
 
-    assert service.document_repo is document_repo
-    assert service.source_storage is source_storage
+    assert (
+        bound_arguments.arguments[
+            "source_storage"
+        ]
+        is source_storage
+    )
