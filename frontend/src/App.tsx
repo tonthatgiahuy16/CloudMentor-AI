@@ -237,7 +237,7 @@ function App() {
             <p className="state-message">Đang tải tài liệu...</p>
           ) : documents.length === 0 ? (
             <p className="state-message">
-              Chưa có tài liệu nào. Hãy tải PDF đầu tiên.
+              Chưa có tài liệu nào. Hãy tải tài liệu đầu tiên.
             </p>
           ) : (
             <div className="table-wrapper">

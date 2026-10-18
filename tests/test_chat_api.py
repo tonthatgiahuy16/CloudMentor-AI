@@ -73,6 +73,8 @@ def test_chat_returns_answer_and_sources():
                     "chunk_index": 0,
                     "source": "chapter-1.pdf",
                     "page": 4,
+                    "line_range": None,
+                    "paragraph_range": None,
                     "distance": 0.123,
                 }
             ],

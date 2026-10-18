@@ -28,4 +28,6 @@ python_files = [
   "test_postgres_chroma_reconciliation_service.py",
   "test_vector_store_records.py",
   "test_reconcile_postgres_chroma_script.py",
+  "test_source_location_contract.py",
+  "test_extract_pipeline.py",
 ]

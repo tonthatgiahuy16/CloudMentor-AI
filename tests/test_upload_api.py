@@ -1,6 +1,8 @@
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -10,7 +12,9 @@ from app.api.upload import (
     get_upload_subject_repository,
     router,
 )
+from io import BytesIO
 
+from docx import Document as WordDocument
 
 class FakeSubjectRepository:
     def __init__(self, subject):
@@ -267,6 +271,10 @@ def test_upload_retains_valid_pdf_when_processing_fails(
 
     assert response.status_code == 500
 
+    assert response.json() == {
+    "detail": "Document processing failed"
+    }
+
     retained_files = list(
         tmp_path.glob("*_lesson.pdf")
     )
@@ -382,7 +390,7 @@ def test_upload_returns_500_when_failed_document_retry_fails(
 
     assert response.status_code == 500
     assert response.json() == {
-        "detail": "PDF retry failed"
+        "detail": "Document retry failed"
     }
     assert service.calls == []
     assert service.retry_calls == [
@@ -450,6 +458,262 @@ def test_upload_rejects_missing_subject_before_writing(
     assert response.status_code == 404
     assert response.json() == {
         "detail": "Subject not found"
+    }
+    assert service.calls == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_upload_accepts_txt_and_retains_source_bytes(
+    tmp_path,
+):
+    client, service = make_client(tmp_path)
+
+    text_data = (
+        "first line\r\n"
+        "second line\r\n"
+    ).encode("utf-8")
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.txt",
+                text_data,
+                "text/plain",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["filename"] == (
+        "lesson.txt"
+    )
+    assert response.json()["chunks"] == 7
+
+    (
+        saved_path,
+        subject_id,
+        chapter,
+        document_id,
+        original_filename,
+        source_uri,
+        content_sha256,
+        file_size_bytes,
+    ) = service.calls[0]
+
+    assert subject_id == (
+        "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+    )
+    assert chapter is None
+    assert original_filename == "lesson.txt"
+    assert saved_path.name == (
+        f"{document_id}_lesson.txt"
+    )
+    assert saved_path.read_bytes() == text_data
+    assert source_uri == saved_path.as_posix()
+    assert content_sha256 == (
+        sha256(text_data).hexdigest()
+    )
+    assert file_size_bytes == len(text_data)
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_status", "expected_detail"),
+    [
+        (
+            b" \r\n\t\r\n",
+            400,
+            "TXT file is empty",
+        ),
+        (
+            b"\xff\xfe\xfa",
+            415,
+            "TXT file is not valid UTF-8",
+        ),
+    ],
+)
+def test_upload_rejects_invalid_txt_before_writing(
+    tmp_path,
+    data,
+    expected_status,
+    expected_detail,
+):
+    client, service = make_client(tmp_path)
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.txt",
+                data,
+                "text/plain",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == expected_status
+    assert response.json() == {
+        "detail": expected_detail,
+    }
+    assert service.calls == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_upload_accepts_docx_and_retains_source_bytes(
+    tmp_path,
+):
+    buffer = BytesIO()
+
+    word_document = WordDocument()
+    word_document.add_paragraph(
+        "First paragraph"
+    )
+    word_document.add_paragraph(
+        "Second paragraph"
+    )
+    word_document.save(buffer)
+
+    docx_data = buffer.getvalue()
+
+    client, service = make_client(tmp_path)
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.docx",
+                docx_data,
+                (
+                    "application/vnd.openxmlformats-"
+                    "officedocument.wordprocessingml."
+                    "document"
+                ),
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["filename"] == (
+        "lesson.docx"
+    )
+    assert response.json()["chunks"] == 7
+
+    (
+        saved_path,
+        subject_id,
+        chapter,
+        document_id,
+        original_filename,
+        source_uri,
+        content_sha256,
+        file_size_bytes,
+    ) = service.calls[0]
+
+    assert original_filename == "lesson.docx"
+    assert saved_path.name == (
+        f"{document_id}_lesson.docx"
+    )
+    assert saved_path.read_bytes() == docx_data
+    assert source_uri == saved_path.as_posix()
+    assert content_sha256 == (
+        sha256(docx_data).hexdigest()
+    )
+    assert file_size_bytes == len(docx_data)
+
+
+@pytest.mark.parametrize(
+    (
+        "case",
+        "expected_status",
+        "expected_detail",
+    ),
+    [
+        (
+            "empty",
+            400,
+            "DOCX file is empty",
+        ),
+        (
+            "table",
+            415,
+            "DOCX tables are not supported",
+        ),
+        (
+            "corrupt",
+            415,
+            "DOCX file is not valid",
+        ),
+    ],
+)
+def test_upload_rejects_invalid_docx_before_writing(
+    tmp_path,
+    case,
+    expected_status,
+    expected_detail,
+):
+    if case == "corrupt":
+        docx_data = b"not a DOCX package"
+    else:
+        buffer = BytesIO()
+        word_document = WordDocument()
+
+        if case == "table":
+            word_document.add_paragraph(
+                "Body paragraph"
+            )
+            table = word_document.add_table(
+                rows=1,
+                cols=1,
+            )
+            table.cell(0, 0).text = (
+                "Table content"
+            )
+
+        word_document.save(buffer)
+        docx_data = buffer.getvalue()
+
+    client, service = make_client(tmp_path)
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "lesson.docx",
+                docx_data,
+                (
+                    "application/vnd.openxmlformats-"
+                    "officedocument.wordprocessingml."
+                    "document"
+                ),
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == (
+        expected_status
+    )
+    assert response.json() == {
+        "detail": expected_detail,
     }
     assert service.calls == []
     assert not list(tmp_path.iterdir())

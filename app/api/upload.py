@@ -20,6 +20,10 @@ from app.repos.subject_repository import (
     SubjectRepository,
 )
 
+from io import BytesIO
+
+from app.rag.loader import read_docx_paragraphs
+
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 PDF_CONTENT_TYPES = {
@@ -27,6 +31,23 @@ PDF_CONTENT_TYPES = {
     "application/x-pdf",
 }
 
+TXT_CONTENT_TYPES = {
+    "text/plain",
+}
+
+DOCX_CONTENT_TYPES = {
+    (
+        "application/vnd.openxmlformats-"
+        "officedocument.wordprocessingml."
+        "document"
+    ),
+}
+
+SUPPORTED_DOCUMENT_EXTENSIONS = {
+    ".pdf",
+    ".txt",
+    ".docx",
+}
 
 router = APIRouter(
     prefix="/upload",
@@ -65,7 +86,7 @@ def get_upload_dir() -> Path:
     )
 
 
-def validate_pdf_upload(
+def validate_document_upload(
     filename: str | None,
     content_type: str | None,
     data: bytes,
@@ -87,29 +108,80 @@ def validate_pdf_upload(
             detail="Invalid filename",
         )
 
-    if Path(original_name).suffix.lower() != ".pdf":
-        raise HTTPException(
-            status_code=415,
-            detail="Only PDF files are supported",
-        )
+    suffix = Path(original_name).suffix.lower()
 
-    if content_type not in PDF_CONTENT_TYPES:
+    if suffix not in SUPPORTED_DOCUMENT_EXTENSIONS:
         raise HTTPException(
             status_code=415,
-            detail="Invalid PDF content type",
+            detail=(
+                "Only PDF, TXT, and DOCX files "
+                "are supported"
+            ),
         )
 
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail="PDF exceeds the 10 MB limit",
+            detail="File exceeds the 10 MB limit",
         )
 
-    if not data.startswith(b"%PDF-"):
-        raise HTTPException(
-            status_code=415,
-            detail="File content is not a PDF",
-        )
+    if suffix == ".pdf":
+        if content_type not in PDF_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=415,
+                detail="Invalid PDF content type",
+            )
+
+        if not data.startswith(b"%PDF-"):
+            raise HTTPException(
+                status_code=415,
+                detail="File content is not a PDF",
+            )
+
+    if suffix == ".txt":
+        if content_type not in TXT_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=415,
+                detail="Invalid TXT content type",
+            )
+
+        try:
+            decoded_text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(
+                status_code=415,
+                detail="TXT file is not valid UTF-8",
+            ) from exc
+
+        if not decoded_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="TXT file is empty",
+            )
+
+    if suffix == ".docx":
+        if content_type not in DOCX_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=415,
+                detail="Invalid DOCX content type",
+            )
+
+        try:
+            read_docx_paragraphs(
+                BytesIO(data)
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            status_code = (
+                400
+                if detail == "DOCX file is empty"
+                else 415
+            )
+
+            raise HTTPException(
+                status_code=status_code,
+                detail=detail,
+            ) from exc
 
     return original_name
 
@@ -118,7 +190,7 @@ def validate_pdf_upload(
     "/",
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_pdf(
+async def upload_document(
     response: Response,
     file: UploadFile = File(...),
     subject_id: str = Form(...),
@@ -147,7 +219,7 @@ async def upload_pdf(
 
     data = await file.read(MAX_UPLOAD_BYTES + 1)
 
-    original_name = validate_pdf_upload(
+    original_name = validate_document_upload(
         file.filename,
         file.content_type,
         data,
@@ -175,7 +247,7 @@ async def upload_pdf(
             except Exception as exc:
                 raise HTTPException(
                     status_code=500,
-                    detail="PDF retry failed",
+                    detail="Document retry failed",
                 ) from exc
 
             response.status_code = (
@@ -233,7 +305,7 @@ async def upload_pdf(
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail="PDF processing failed",
+            detail="Document processing failed",
         ) from exc
 
     return {
