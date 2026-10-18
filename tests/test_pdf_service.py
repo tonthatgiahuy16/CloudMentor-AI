@@ -4,7 +4,12 @@ from unittest.mock import Mock, call
 import pytest
 
 from app.services.pdf_service import PDFService
+from app.pipeline.chunk_pipeline import ChunkPipeline
+from app.pipeline.extract_pipeline import ExtractPipeline
+from app.pipeline.transform_pipeline import TransformPipeline
+from app.rag.chunker import TextChunker
 
+from docx import Document as WordDocument
 
 def test_retry_failed_document_reuses_source_and_document_id(
     tmp_path,
@@ -388,3 +393,332 @@ def test_rebuild_retained_document_marks_invalid_source_failed():
         ),
     )
     service.index.delete_by_document_id.assert_not_called()
+
+
+def test_upload_txt_records_file_type_and_processes(
+    tmp_path,
+):
+    text_data = b"first line\nsecond line"
+    source_path = tmp_path / "retained.txt"
+    source_path.write_bytes(text_data)
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service._process_document = Mock(
+        return_value=2
+    )
+
+    result = service.upload(
+        str(source_path),
+        subject_id="subject-1",
+        document_id="document-1",
+        original_filename="lesson.txt",
+        source_uri=source_path.as_posix(),
+        content_sha256=sha256(
+            text_data
+        ).hexdigest(),
+        file_size_bytes=len(text_data),
+    )
+
+    assert result == 2
+
+    service.document_repo.create.assert_called_once_with(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        file_type="txt",
+        chapter=None,
+        source_uri=source_path.as_posix(),
+        content_sha256=sha256(
+            text_data
+        ).hexdigest(),
+        file_size_bytes=len(text_data),
+    )
+    service._process_document.assert_called_once_with(
+        file_path=str(source_path),
+        document_id="document-1",
+        subject_id="subject-1",
+    )
+
+
+def test_process_txt_preserves_exact_line_ranges(
+    tmp_path,
+):
+    source_path = tmp_path / "lesson.txt"
+    source_path.write_bytes(
+        b"alpha\r\nbeta\r\ngamma\r\n"
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.extract = ExtractPipeline()
+    service.transform = TransformPipeline()
+    service.chunk = ChunkPipeline()
+    service.chunk.chunker = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    )
+    service.embedding = Mock()
+    service.index = Mock()
+
+    embeddings = object()
+    service.embedding.run.return_value = embeddings
+
+    result = service._process_document(
+        file_path=str(source_path),
+        document_id="document-1",
+        subject_id="subject-1",
+    )
+
+    assert result == 3
+
+    chunks = service.index.run.call_args.args[0]
+
+    assert [chunk.text for chunk in chunks] == [
+        "alpha\n",
+        "beta\ng",
+        "amma",
+    ]
+    assert [
+        chunk.line_range for chunk in chunks
+    ] == [
+        (1, 1),
+        (2, 3),
+        (3, 3),
+    ]
+    assert all(
+        chunk.page is None
+        for chunk in chunks
+    )
+    assert all(
+        chunk.paragraph_range is None
+        for chunk in chunks
+    )
+
+    service.embedding.run.assert_called_once_with(
+        chunks
+    )
+    service.index.run.assert_called_once_with(
+        chunks,
+        embeddings,
+    )
+    service.document_repo.mark_indexed.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.mark_failed.assert_not_called()
+
+
+def test_rebuild_retained_txt_reuses_identity_and_lineage(
+    tmp_path,
+):
+    text_data = b"alpha\nbeta\ngamma"
+    source_path = tmp_path / "retained.txt"
+    source_path.write_bytes(text_data)
+
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        file_type="txt",
+        status="INDEXED",
+        source_uri=source_path.as_posix(),
+        content_sha256=sha256(
+            text_data
+        ).hexdigest(),
+        file_size_bytes=len(text_data),
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.extract = ExtractPipeline()
+    service.transform = TransformPipeline()
+    service.chunk = ChunkPipeline()
+    service.chunk.chunker = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    )
+    service.embedding = Mock()
+    service.index = Mock()
+
+    embeddings = object()
+    service.embedding.run.return_value = embeddings
+
+    result = service.rebuild_retained_document(
+        document
+    )
+
+    assert result == 3
+
+    service.index.delete_by_document_id.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.create.assert_not_called()
+
+    chunks = service.index.run.call_args.args[0]
+
+    assert {
+        chunk.document_id
+        for chunk in chunks
+    } == {"document-1"}
+    assert [
+        chunk.line_range
+        for chunk in chunks
+    ] == [
+        (1, 1),
+        (2, 3),
+        (3, 3),
+    ]
+
+    service.document_repo.mark_processing.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.mark_indexed.assert_called_once_with(
+        "document-1"
+    )
+
+
+def test_process_docx_preserves_exact_paragraph_ranges(
+    tmp_path,
+):
+    source_path = tmp_path / "lesson.docx"
+
+    word_document = WordDocument()
+    word_document.add_paragraph("alpha")
+    word_document.add_paragraph("beta")
+    word_document.add_paragraph("gamma")
+    word_document.save(source_path)
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.extract = ExtractPipeline()
+    service.transform = TransformPipeline()
+    service.chunk = ChunkPipeline()
+    service.chunk.chunker = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    )
+    service.embedding = Mock()
+    service.index = Mock()
+
+    embeddings = object()
+    service.embedding.run.return_value = embeddings
+
+    result = service._process_document(
+        file_path=str(source_path),
+        document_id="document-1",
+        subject_id="subject-1",
+    )
+
+    assert result == 3
+
+    chunks = service.index.run.call_args.args[0]
+
+    assert [chunk.text for chunk in chunks] == [
+        "alpha\n",
+        "beta\ng",
+        "amma",
+    ]
+    assert [
+        chunk.paragraph_range
+        for chunk in chunks
+    ] == [
+        (1, 1),
+        (2, 3),
+        (3, 3),
+    ]
+    assert all(
+        chunk.page is None
+        for chunk in chunks
+    )
+    assert all(
+        chunk.line_range is None
+        for chunk in chunks
+    )
+
+    service.document_repo.mark_indexed.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.mark_failed.assert_not_called()
+
+
+def test_rebuild_retained_docx_reuses_identity_and_lineage(
+    tmp_path,
+):
+    source_path = tmp_path / "retained.docx"
+
+    word_document = WordDocument()
+    word_document.add_paragraph("alpha")
+    word_document.add_paragraph("beta")
+    word_document.add_paragraph("gamma")
+    word_document.save(source_path)
+
+    source_data = source_path.read_bytes()
+
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.docx",
+        file_type="docx",
+        status="INDEXED",
+        source_uri=source_path.as_posix(),
+        content_sha256=sha256(
+            source_data
+        ).hexdigest(),
+        file_size_bytes=len(source_data),
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.extract = ExtractPipeline()
+    service.transform = TransformPipeline()
+    service.chunk = ChunkPipeline()
+    service.chunk.chunker = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    )
+    service.embedding = Mock()
+    service.index = Mock()
+
+    embeddings = object()
+    service.embedding.run.return_value = embeddings
+
+    result = service.rebuild_retained_document(
+        document
+    )
+
+    assert result == 3
+
+    service.index.delete_by_document_id.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.create.assert_not_called()
+
+    chunks = service.index.run.call_args.args[0]
+
+    assert {
+        chunk.document_id
+        for chunk in chunks
+    } == {"document-1"}
+    assert [
+        chunk.paragraph_range
+        for chunk in chunks
+    ] == [
+        (1, 1),
+        (2, 3),
+        (3, 3),
+    ]
+    assert all(
+        chunk.line_range is None
+        for chunk in chunks
+    )
+    assert all(
+        chunk.page is None
+        for chunk in chunks
+    )
+
+    service.document_repo.mark_processing.assert_called_once_with(
+        "document-1"
+    )
+    service.document_repo.mark_indexed.assert_called_once_with(
+        "document-1"
+    )

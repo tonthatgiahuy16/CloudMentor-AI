@@ -17,29 +17,154 @@ class TextChunker:
         self.chunk_size = chunk_size
         self.overlap = overlap
 
+    @staticmethod
+    def _source_range_for_slice(
+        *,
+        text: str,
+        source_range: tuple[int, int],
+        start: int,
+        end: int,
+    ) -> tuple[int, int]:
+        base_start, declared_end = (
+            source_range
+        )
+
+        start_offset = text.count(
+            "\n",
+            0,
+            start,
+        )
+
+        last_character_index = end - 1
+        end_offset = text.count(
+            "\n",
+            0,
+            last_character_index,
+        )
+
+        calculated_range = (
+            base_start + start_offset,
+            base_start + end_offset,
+        )
+
+        if calculated_range[1] > declared_end:
+            raise ValueError(
+                "Source range does not match "
+                "text boundaries"
+            )
+
+        return calculated_range
+
+
+    @staticmethod
+    def _validate_text_boundaries(
+        document: Document,
+    ) -> None:
+        source_range = (
+            document.line_range
+            if document.line_range is not None
+            else document.paragraph_range
+        )
+
+        if source_range is None:
+            return
+
+        declared_start, declared_end = (
+            source_range
+        )
+        expected_unit_count = (
+            declared_end
+            - declared_start
+            + 1
+        )
+        actual_unit_count = (
+            document.text.count("\n")
+            + 1
+        )
+
+        if (
+            actual_unit_count
+            != expected_unit_count
+        ):
+            raise ValueError(
+                "Source range does not match "
+                "text boundaries"
+            )
+
+
     def split(self, documents: List[Document]) -> List[Chunk]:
         chunks: List[Chunk] = []
         step = self.chunk_size - self.overlap
 
         for document in documents:
+            self._validate_text_boundaries(
+                document
+            )
+
             start = 0
             chunk_index = 0
 
             while start < len(document.text):
-                end = start + self.chunk_size
+                end = min(
+                    start + self.chunk_size,
+                    len(document.text),
+                )
+
+                line_range = None
+                paragraph_range = None
+
+                if document.line_range is not None:
+                    line_range = (
+                        self._source_range_for_slice(
+                            text=document.text,
+                            source_range=(
+                                document.line_range
+                            ),
+                            start=start,
+                            end=end,
+                        )
+                    )
+
+                elif (
+                    document.paragraph_range
+                    is not None
+                ):
+                    paragraph_range = (
+                        self._source_range_for_slice(
+                            text=document.text,
+                            source_range=(
+                                document.paragraph_range
+                            ),
+                            start=start,
+                            end=end,
+                        )
+                    )
+
                 chunks.append(
                     Chunk(
-                        subject_id=document.subject_id,
+                        subject_id=(
+                            document.subject_id
+                        ),
                         id=str(uuid.uuid4()),
-                        document_id=document.document_id,
+                        document_id=(
+                            document.document_id
+                        ),
                         chunk_index=chunk_index,
                         page=document.page,
+                        line_range=line_range,
+                        paragraph_range=(
+                            paragraph_range
+                        ),
                         source=document.source,
-                        text=document.text[start:end],
+                        text=document.text[
+                            start:end
+                        ],
                     )
                 )
+
                 if end >= len(document.text):
                     break
+
                 start += step
                 chunk_index += 1
 

@@ -25,18 +25,44 @@ async function getErrorMessage(
     const payload: unknown = await response.json()
 
     if (
-      typeof payload === 'object'
-      && payload !== null
-      && 'detail' in payload
-      && typeof payload.detail === 'string'
+      typeof payload !== 'object'
+      || payload === null
+      || !('detail' in payload)
     ) {
-      return payload.detail
+      return fallback
     }
-  } catch {
-    // Response did not contain JSON.
-  }
 
-  return fallback
+    const detail: unknown = payload.detail
+
+    if (typeof detail === 'string') {
+      return detail
+    }
+
+    if (
+      typeof detail !== 'object'
+      || detail === null
+      || !('code' in detail)
+    ) {
+      return fallback
+    }
+
+    if (detail.code !== 'DOCUMENT_ALREADY_EXISTS') {
+      return fallback
+    }
+
+    const documentStatus: unknown =
+      'status' in detail
+        ? detail.status
+        : undefined
+
+    if (documentStatus === 'INDEXED') {
+      return 'Tài liệu này đã được tải lên và lập chỉ mục'
+    }
+
+    return 'Tài liệu này đã được tải lên trước đó'
+  } catch {
+    return fallback
+  }
 }
 
 export async function getDocuments(): Promise<DocumentRecord[]> {

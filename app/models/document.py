@@ -1,13 +1,28 @@
 from dataclasses import dataclass
-
+from app.models.source_location import (
+    validate_source_location,
+)
 
 @dataclass
 class Document:
     """
-    Đại diện cho một trang tài liệu sau khi đọc từ PDF.
+    Extracted source unit with traceable source location.
     """
+
     document_id: str
     subject_id: str
-    page: int
     source: str
     text: str
+    page: int | None = None
+    line_range: tuple[int, int] | None = None
+    paragraph_range: tuple[int, int] | None = None
+
+    def __post_init__(self) -> None:
+        validate_source_location(
+            owner="Document",
+            page=self.page,
+            line_range=self.line_range,
+            paragraph_range=(
+                self.paragraph_range
+            ),
+        )

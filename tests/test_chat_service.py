@@ -144,3 +144,104 @@ def test_chat_service_ignores_chunks_without_lineage():
         ),
         "sources": [],
     }
+
+
+class RetrieverWithNonPageLocations:
+    def search(
+        self,
+        vector,
+        subject_id=None,
+    ):
+        assert vector == [0.1, 0.2]
+        assert subject_id == "subject-1"
+
+        return [
+            {
+                "chunk_id": "txt-chunk",
+                "document": "Text content",
+                "metadata": {
+                    "document_id": "txt-document",
+                    "chunk_index": 0,
+                    "source": "lesson.txt",
+                    "line_start": 3,
+                    "line_end": 7,
+                },
+                "distance": 0.1,
+            },
+            {
+                "chunk_id": "docx-chunk",
+                "document": "Word content",
+                "metadata": {
+                    "document_id": "docx-document",
+                    "chunk_index": 0,
+                    "source": "lesson.docx",
+                    "paragraph_start": 4,
+                    "paragraph_end": 6,
+                },
+                "distance": 0.2,
+            },
+        ]
+
+
+class CapturingGenerator:
+    def __init__(self):
+        self.contexts = None
+
+    def generate(
+        self,
+        question,
+        contexts,
+    ):
+        self.contexts = contexts
+        return "Answer"
+
+
+def test_chat_service_returns_format_aware_source_locations():
+    generator = CapturingGenerator()
+
+    service = ChatService(
+        embedder=FakeEmbedder(),
+        retriever=(
+            RetrieverWithNonPageLocations()
+        ),
+        generator=generator,
+    )
+
+    result = service.ask(
+        "What is cloud computing?",
+        subject_id="subject-1",
+    )
+
+    assert result["sources"] == [
+        {
+            "chunk_id": "txt-chunk",
+            "document_id": "txt-document",
+            "chunk_index": 0,
+            "source": "lesson.txt",
+            "page": None,
+            "line_range": (3, 7),
+            "paragraph_range": None,
+            "distance": 0.1,
+        },
+        {
+            "chunk_id": "docx-chunk",
+            "document_id": "docx-document",
+            "chunk_index": 0,
+            "source": "lesson.docx",
+            "page": None,
+            "line_range": None,
+            "paragraph_range": (4, 6),
+            "distance": 0.2,
+        },
+    ]
+
+    assert generator.contexts is not None
+    assert "Lines: 3-7" in generator.contexts[0]
+    assert (
+        "Paragraphs: 4-6"
+        in generator.contexts[1]
+    )
+    assert all(
+        "Page: None" not in context
+        for context in generator.contexts
+    )

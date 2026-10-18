@@ -1,6 +1,69 @@
 from typing import Any
 
 from app.core.logger import logger
+from app.models.source_location import (
+    validate_source_location,
+)
+
+
+def parse_source_location(
+    metadata: dict[str, Any],
+) -> tuple[dict[str, Any], str] | None:
+    page = metadata.get("page")
+
+    line_range = None
+    if (
+        metadata.get("line_start") is not None
+        and metadata.get("line_end") is not None
+    ):
+        line_range = (
+            metadata["line_start"],
+            metadata["line_end"],
+        )
+
+    paragraph_range = None
+    if (
+        metadata.get("paragraph_start")
+        is not None
+        and metadata.get("paragraph_end")
+        is not None
+    ):
+        paragraph_range = (
+            metadata["paragraph_start"],
+            metadata["paragraph_end"],
+        )
+
+    try:
+        validate_source_location(
+            owner="Retrieved chunk",
+            page=page,
+            line_range=line_range,
+            paragraph_range=paragraph_range,
+        )
+    except ValueError:
+        return None
+
+    fields = {
+        "page": page,
+        "line_range": line_range,
+        "paragraph_range": paragraph_range,
+    }
+
+    if page is not None:
+        label = f"Page: {page}"
+    elif line_range is not None:
+        label = (
+            f"Lines: {line_range[0]}-"
+            f"{line_range[1]}"
+        )
+    else:
+        label = (
+            "Paragraphs: "
+            f"{paragraph_range[0]}-"
+            f"{paragraph_range[1]}"
+        )
+
+    return fields, label
 
 
 class ChatService:
@@ -70,11 +133,28 @@ class ChatService:
                 )
                 continue
 
+            parsed_location = (
+                parse_source_location(metadata)
+            )
+
+            if parsed_location is None:
+                logger.warning(
+                    "Skipping chunk without valid "
+                    "source location: %s",
+                    item.get("chunk_id"),
+                )
+                continue
+
+            (
+                source_location,
+                source_location_label,
+            ) = parsed_location
+
             contexts.append(
                 "\n".join(
                     [
                         f"Source: {metadata.get('source')}",
-                        f"Page: {metadata.get('page')}",
+                        source_location_label,
                         f"Content: {item.get('document', '')}",
                     ]
                 )
@@ -85,7 +165,7 @@ class ChatService:
                     "document_id": document_id,
                     "chunk_index": metadata.get("chunk_index"),
                     "source": metadata.get("source"),
-                    "page": metadata.get("page"),
+                    **source_location,
                     "distance": round(item["distance"], 3),
                 }
             )

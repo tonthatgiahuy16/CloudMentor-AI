@@ -1,6 +1,15 @@
 from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
+
+from app.models.source_location import (
+    validate_source_location,
+)
 
 
 class ChatRequest(BaseModel):
@@ -41,8 +50,25 @@ class SourceResponse(BaseModel):
     document_id: str
     chunk_index: int
     source: str
-    page: int
+    page: int | None = None
+    line_range: tuple[int, int] | None = None
+    paragraph_range: tuple[int, int] | None = None
     distance: float
+
+    @model_validator(mode="after")
+    def source_location_must_be_valid(
+        self,
+    ):
+        validate_source_location(
+            owner="Source response",
+            page=self.page,
+            line_range=self.line_range,
+            paragraph_range=(
+                self.paragraph_range
+            ),
+        )
+
+        return self
 
 
 class ChatResponse(BaseModel):

@@ -57,3 +57,207 @@ def test_chunk_indices_reset_for_each_document():
 def test_chunker_rejects_invalid_configuration(chunk_size, overlap):
     with pytest.raises(ValueError):
         TextChunker(chunk_size=chunk_size, overlap=overlap)
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        {
+            "line_range": (3, 3),
+        },
+        {
+            "paragraph_range": (2, 2),
+        },
+    ],
+)
+def test_chunker_preserves_non_page_source_location(
+    location,
+):
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson",
+        text="abcdefgh",
+        **location,
+    )
+
+    chunks = TextChunker(
+        chunk_size=5,
+        overlap=1,
+    ).split([document])
+
+    assert len(chunks) == 2
+
+    for chunk in chunks:
+        assert chunk.page == document.page
+        assert (
+            chunk.line_range
+            == document.line_range
+        )
+        assert (
+            chunk.paragraph_range
+            == document.paragraph_range
+        )
+
+
+@pytest.mark.parametrize(
+    (
+        "location",
+        "expected_line_ranges",
+        "expected_paragraph_ranges",
+    ),
+    [
+        (
+            {
+                "line_range": (10, 12),
+            },
+            [
+                (10, 11),
+                (11, 12),
+                (12, 12),
+            ],
+            [None, None, None],
+        ),
+        (
+            {
+                "paragraph_range": (4, 6),
+            },
+            [None, None, None],
+            [
+                (4, 5),
+                (5, 6),
+                (6, 6),
+            ],
+        ),
+    ],
+)
+def test_chunker_calculates_exact_source_ranges(
+    location,
+    expected_line_ranges,
+    expected_paragraph_ranges,
+):
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson",
+        text="aaaa\nbbbb\ncccc",
+        **location,
+    )
+
+    chunks = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    ).split([document])
+
+    assert [
+        chunk.text
+        for chunk in chunks
+    ] == [
+        "aaaa\nb",
+        "bbb\ncc",
+        "cc",
+    ]
+    assert [
+        chunk.line_range
+        for chunk in chunks
+    ] == expected_line_ranges
+    assert [
+        chunk.paragraph_range
+        for chunk in chunks
+    ] == expected_paragraph_ranges
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        {
+            "line_range": (3, 4),
+        },
+        {
+            "paragraph_range": (2, 3),
+        },
+    ],
+)
+def test_chunker_rejects_source_range_that_does_not_match_text(
+    location,
+):
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson",
+        text="only one unit",
+        **location,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Source range does not match "
+            "text boundaries"
+        ),
+    ):
+        TextChunker(
+            chunk_size=10,
+            overlap=0,
+        ).split([document])
+
+
+def test_chunker_calculates_ranges_with_overlap():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.txt",
+        text="1111\n2222\n3333",
+        line_range=(10, 12),
+    )
+
+    chunks = TextChunker(
+        chunk_size=8,
+        overlap=3,
+    ).split([document])
+
+    assert [
+        chunk.text
+        for chunk in chunks
+    ] == [
+        "1111\n222",
+        "2222\n333",
+        "3333",
+    ]
+    assert [
+        chunk.line_range
+        for chunk in chunks
+    ] == [
+        (10, 11),
+        (11, 12),
+        (12, 12),
+    ]
+
+
+def test_chunker_does_not_claim_next_unit_at_newline_boundary():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.txt",
+        text="aaaa\nbbbb",
+        line_range=(10, 11),
+    )
+
+    chunks = TextChunker(
+        chunk_size=5,
+        overlap=0,
+    ).split([document])
+
+    assert [
+        chunk.text
+        for chunk in chunks
+    ] == [
+        "aaaa\n",
+        "bbbb",
+    ]
+    assert [
+        chunk.line_range
+        for chunk in chunks
+    ] == [
+        (10, 10),
+        (11, 11),
+    ]

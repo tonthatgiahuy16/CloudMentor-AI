@@ -5,7 +5,10 @@ import {
   askQuestion,
   getSubjects,
 } from '../services/api'
-import type { ChatResponse } from '../types/chat'
+import type {
+  ChatResponse,
+  ChatSource,
+} from '../types/chat'
 import type { DocumentRecord } from '../types/document'
 import type { SubjectRecord } from '../types/subject'
 
@@ -185,7 +188,7 @@ function ChatPanel({ documents }: ChatPanelProps) {
                     {getDocumentName(
                       source.document_id,
                       source.source,
-                    )} — trang {source.page}
+                    )} — {formatSourceLocation(source)}
                   </li>
                 ))}
               </ul>
@@ -195,6 +198,32 @@ function ChatPanel({ documents }: ChatPanelProps) {
       )}
     </section>
   )
+}
+
+function formatSourceLocation(
+  source: ChatSource,
+): string {
+  if (source.page !== null) {
+    return `trang ${source.page}`
+  }
+
+  if (source.line_range !== null) {
+    const [start, end] = source.line_range
+
+    return start === end
+      ? `dòng ${start}`
+      : `dòng ${start}–${end}`
+  }
+
+  if (source.paragraph_range !== null) {
+    const [start, end] = source.paragraph_range
+
+    return start === end
+      ? `đoạn ${start}`
+      : `đoạn ${start}–${end}`
+  }
+
+  return 'vị trí không xác định'
 }
 
 export default ChatPanel

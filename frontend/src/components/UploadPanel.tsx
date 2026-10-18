@@ -13,6 +13,33 @@ import type { SubjectRecord } from '../types/subject'
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
+const SUPPORTED_DOCUMENT_EXTENSIONS = [
+  '.pdf',
+  '.txt',
+  '.docx',
+] as const
+
+const DOCUMENT_ACCEPT = [
+  '.pdf',
+  'application/pdf',
+  '.txt',
+  'text/plain',
+  '.docx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+].join(',')
+
+function isSupportedDocument(
+  filename: string,
+): boolean {
+  const normalizedName = filename.toLowerCase()
+
+  return SUPPORTED_DOCUMENT_EXTENSIONS.some(
+    (extension) => (
+      normalizedName.endsWith(extension)
+    ),
+  )
+}
+
 interface UploadPanelProps {
   onUploaded: () => Promise<void>
 }
@@ -113,20 +140,18 @@ function UploadPanel({
       return
     }
 
-    if (
-      !nextFile.name
-        .toLowerCase()
-        .endsWith('.pdf')
-    ) {
+    if (!isSupportedDocument(nextFile.name)) {
       setFile(null)
-      setError('Chỉ hỗ trợ file PDF')
+      setError(
+        'Chỉ hỗ trợ file PDF, TXT hoặc DOCX',
+      )
       return
     }
 
     if (nextFile.size > MAX_UPLOAD_BYTES) {
       setFile(null)
       setError(
-        'File PDF không được vượt quá 10 MB',
+        'Tài liệu không được vượt quá 10 MB',
       )
       return
     }
@@ -163,7 +188,7 @@ function UploadPanel({
     if (droppedFiles.length !== 1) {
       setFile(null)
       setError(
-        'Chỉ được tải một file PDF mỗi lần',
+        'Chỉ được tải một tài liệu mỗi lần',
       )
       setSuccess(null)
       return
@@ -183,17 +208,21 @@ function UploadPanel({
     setSuccess(null)
 
     if (!file) {
-      setError('Hãy chọn một file PDF')
+      setError('Hãy chọn một tài liệu')
       return
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('Chỉ hỗ trợ file PDF')
+    if (!isSupportedDocument(file.name)) {
+      setError(
+        'Chỉ hỗ trợ file PDF, TXT hoặc DOCX',
+      )
       return
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError('File PDF không được vượt quá 10 MB')
+      setError(
+        'Tài liệu không được vượt quá 10 MB',
+      )
       return
     }
 
@@ -251,10 +280,13 @@ function UploadPanel({
           <span className="eyebrow">Document ingestion</span>
           <h2>Tải tài liệu mới</h2>
           <p>
-            PDF sẽ được xử lý, chia chunks và lập chỉ mục tìm kiếm.
+            PDF, TXT và DOCX sẽ được xử lý, chia chunks
+            và lập chỉ mục tìm kiếm.
           </p>
         </div>
-        <span className="upload-limit">PDF · tối đa 10 MB</span>
+        <span className="upload-limit">
+          PDF · TXT · DOCX · tối đa 10 MB
+        </span>
       </div>
 
       <form
@@ -338,12 +370,12 @@ function UploadPanel({
   <span>
     {file
       ? file.name
-      : 'Chọn hoặc kéo thả file PDF vào đây'}
+      : 'Chọn hoặc kéo thả PDF, TXT hoặc DOCX vào đây'}
   </span>
 
   <input
     type="file"
-    accept=".pdf,application/pdf"
+    accept={DOCUMENT_ACCEPT}
     onChange={(event) => {
       handleSelectedFile(
         event.target.files?.[0] ?? null,

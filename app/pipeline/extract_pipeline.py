@@ -1,11 +1,20 @@
-from app.rag.loader import PDFLoader
+from pathlib import Path
+
+from app.rag.loader import (
+    DOCXLoader,
+    PDFLoader,
+    TextLoader,
+)
 
 
 class ExtractPipeline:
 
     def __init__(self):
-
-        self.loader = PDFLoader()
+        self.loaders = {
+            ".pdf": PDFLoader(),
+            ".txt": TextLoader(),
+            ".docx": DOCXLoader(),
+        }
 
     def run(
         self,
@@ -13,11 +22,16 @@ class ExtractPipeline:
         document_id,
         subject_id,
     ):
+        suffix = Path(file_path).suffix.lower()
+        loader = self.loaders.get(suffix)
 
-        return self.loader.load(
+        if loader is None:
+            raise ValueError(
+                f"Unsupported document type: {suffix}"
+            )
+
+        return loader.load(
             file_path,
             document_id,
             subject_id,
         )
-        
-        

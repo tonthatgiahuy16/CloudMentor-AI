@@ -49,18 +49,47 @@ class VectorStore:
                 chunk.text
             )
 
-            metadatas.append(
-                {
-                    "chunk_index": chunk.chunk_index,
-                    "document_id": chunk.document_id,
-                    "subject_id": chunk.subject_id,
-                    "page": chunk.page,
-                    "source": chunk.source,
-                    
-                }
-            )
+            metadata = {
+                "chunk_index": chunk.chunk_index,
+                "document_id": chunk.document_id,
+                "subject_id": chunk.subject_id,
+                "source": chunk.source,
+            }
 
-    
+            if chunk.page is not None:
+                metadata["page"] = chunk.page
+
+            elif chunk.line_range is not None:
+                line_start, line_end = (
+                    chunk.line_range
+                )
+                metadata["line_start"] = (
+                    line_start
+                )
+                metadata["line_end"] = line_end
+
+            elif (
+                chunk.paragraph_range
+                is not None
+            ):
+                (
+                    paragraph_start,
+                    paragraph_end,
+                ) = chunk.paragraph_range
+
+                metadata["paragraph_start"] = (
+                    paragraph_start
+                )
+                metadata["paragraph_end"] = (
+                    paragraph_end
+                )
+
+            else:
+                raise ValueError(
+                    "Chunk source location is missing"
+                )
+
+            metadatas.append(metadata)
 
 
         self.collection.add(
