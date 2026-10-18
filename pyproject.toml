@@ -30,4 +30,5 @@ python_files = [
   "test_reconcile_postgres_chroma_script.py",
   "test_source_location_contract.py",
   "test_extract_pipeline.py",
+  "test_source_storage.py",
 ]

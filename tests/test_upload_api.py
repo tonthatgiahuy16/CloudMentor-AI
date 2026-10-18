@@ -1,7 +1,7 @@
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
-
+from unittest.mock import Mock
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -10,11 +10,16 @@ from app.api.upload import (
     get_pdf_service,
     get_upload_dir,
     get_upload_subject_repository,
+    get_source_storage,
     router,
 )
 from io import BytesIO
 
 from docx import Document as WordDocument
+
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
 
 class FakeSubjectRepository:
     def __init__(self, subject):
@@ -139,9 +144,15 @@ def make_client(
     tmp_path,
     service=None,
     subject=DEFAULT_SUBJECT,
+    source_storage=None,
 ):
     if service is None:
         service = FakePDFService()
+
+    if source_storage is None:
+        source_storage = LocalSourceStorage(
+            root=tmp_path,
+        )
 
     if subject is DEFAULT_SUBJECT:
         subject = SimpleNamespace(
@@ -162,6 +173,9 @@ def make_client(
     app.dependency_overrides[get_upload_dir] = (
         lambda: tmp_path
     )
+    app.dependency_overrides[get_source_storage] = (
+        lambda: source_storage
+    )
     app.dependency_overrides[
         get_upload_subject_repository
     ] = lambda: subject_repo
@@ -172,7 +186,13 @@ def make_client(
 def test_upload_accepts_pdf_and_uses_safe_server_filename(
     tmp_path,
 ):
-    client, service = make_client(tmp_path)
+    storage = Mock(
+        wraps=LocalSourceStorage(root=tmp_path)
+    )
+    client, service = make_client(
+        tmp_path,
+        source_storage=storage,
+    )
 
     pdf_data = b"%PDF-1.4\ncontent"
 
@@ -194,6 +214,15 @@ def test_upload_accepts_pdf_and_uses_safe_server_filename(
     )
 
     assert response.status_code == 201
+    storage.store.assert_called_once()
+
+    store_arguments = storage.store.call_args.kwargs
+
+    assert store_arguments["document_id"] == (
+        response.json()["document_id"]
+    )
+    assert store_arguments["filename"] == "lesson.pdf"
+    assert store_arguments["data"] == pdf_data
     payload = response.json()
     assert payload["filename"] == "lesson.pdf"
     assert payload["chunks"] == 7

@@ -2,6 +2,10 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
+
 
 class RetainedSourceValidationError(
     RuntimeError
@@ -10,7 +14,11 @@ class RetainedSourceValidationError(
 
 
 class PDFService:
-    def __init__(self, document_repo):
+    def __init__(
+        self,
+        document_repo,
+        source_storage=None,
+    ):
         from app.pipeline.chunk_pipeline import (
             ChunkPipeline,
         )
@@ -33,6 +41,13 @@ class PDFService:
         self.embedding = EmbeddingPipeline()
         self.index = IndexPipeline()
         self.document_repo = document_repo
+
+        if source_storage is None:
+            source_storage = LocalSourceStorage(
+                root=Path("."),
+            )
+
+        self.source_storage = source_storage
 
 
     def find_active_duplicate(
@@ -147,14 +162,19 @@ class PDFService:
                 "Document source metadata is incomplete"
             )
 
-        source_path = Path(document.source_uri)
-
-        if not source_path.is_file():
+        try:
+            source_data = (
+                self.source_storage.read_bytes(
+                    document.source_uri
+                )
+            )
+        except (
+            FileNotFoundError,
+            IsADirectoryError,
+        ) as exc:
             raise RetainedSourceValidationError(
                 "Retained source file is missing"
-            )
-
-        source_data = source_path.read_bytes()
+            ) from exc
 
         if len(source_data) != document.file_size_bytes:
             raise RetainedSourceValidationError(

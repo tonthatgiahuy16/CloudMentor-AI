@@ -11,7 +11,7 @@ __pycache__/
 .mypy_cache/
 
 chroma_db/
-storage/
+/storage/
 uploads/
 logs/
 *.log
