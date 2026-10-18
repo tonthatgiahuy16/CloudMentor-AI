@@ -7,12 +7,12 @@ This document records the implementation status of CloudMentor AI at a specific 
 | Field | Value |
 | --- | --- |
 | Snapshot date | 2026-10-19 |
-| Application baseline | `2564cbdbf10838c20f266cb82ca0153d0cb889ca` |
-| Current milestone | Recoverable multi-format subject-scoped local RAG lifecycle |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX now share a format-aware ingestion and citation contract; duplicate-safe retry, stale recovery, subject trash and restore, guarded legacy-source repair, and PostgreSQL-Chroma reconciliation audit are implemented; durable object storage, concurrent duplicate protection, automated drift repair, and retrieval evaluation remain |
-| CI evidence | GitHub Actions backend and frontend checks passed through PR #28; commit `2564cbd` is locally verified with 240 backend tests, frontend lint and build, and live TXT/DOCX evidence, but has not yet passed CI |
+| Application baseline | `e0d6afbef4fce5beef0b8008d144da5f843d6324` |
+| Current milestone | Phase 2 locked: recoverable multi-format subject-scoped local RAG lifecycle |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX now have a locally recoverable lifecycle; upload and retained-source validation use an injectable local source-storage boundary; path-independent extraction, durable object storage, concurrent duplicate protection, automated drift repair, and retrieval evaluation remain |
+| CI evidence | GitHub Actions backend and frontend checks passed through PR #30; `main` at `e0d6afb` is locally verified with 245 backend tests, frontend lint and build, and a live TXT recovery cycle |
 
-The status was captured on `feat/txt-docx-ingestion` at `2564cbdbf10838c20f266cb82ca0153d0cb889ca` before this documentation update receives its own commit.
+The status was captured against `main` at `e0d6afbef4fce5beef0b8008d144da5f843d6324` before this documentation update receives its own commit.
 
 ## Current capability
 
@@ -20,7 +20,7 @@ CloudMentor AI currently supports this local workflow:
 
 ```text
 create subject
-    -> validate and retain a canonical PDF, UTF-8 TXT, or body-paragraph DOCX
+    -> validate and retain a canonical PDF, UTF-8 TXT, or body-paragraph DOCX through the local source-storage boundary
     -> record source URI, SHA-256, and file size in PostgreSQL
     -> reject an active duplicate or retry a failed ingestion with the same identity
     -> extract, clean, and preserve page, line, or paragraph boundaries
@@ -38,6 +38,8 @@ create subject
 
 Operational recovery paths also exist for stale ingestions and for legacy document rows whose retained-source metadata is missing. Both workflows preserve the existing document identity, and the legacy repair command defaults to dry run before any filesystem or PostgreSQL change.
 
+Canonical source writes and retained-source validation now use an injectable source-storage interface, with `LocalSourceStorage` as the first implementation. The remaining extraction path still consumes `source_uri` as a local filesystem path, so a remote object store is not yet a drop-in replacement; path-independent reads or controlled local materialization must be completed before adding MinIO.
+
 A read-only PostgreSQL-Chroma reconciliation workflow compares the relational lifecycle registry with the derived vector index. It reports indexed documents missing from Chroma, chunks without document lineage, chunks for unknown documents, chunks for known but non-expected documents, and subject mismatches. Drift is reported with a nonzero exit code; automated repair is not yet implemented.
 
 The core application lifecycle remains covered by `tests/test_document_lifecycle_e2e.py`, which exercises real FastAPI routes, repositories, lifecycle orchestration, format-aware source metadata, and an isolated temporary Chroma index. Deterministic test doubles replace external embedding and answer generation at that boundary, while focused contract, loader, chunker, repository, service, API, and CLI tests cover PDF/TXT/DOCX validation, citation lineage, duplicate handling, retry, deletion, rebuild, stale recovery, subject trash and restore, legacy-source repair, and reconciliation reporting.
@@ -51,7 +53,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Subject creation and active listing | Implemented | API, repository, and frontend verification |
 | Subject trash and restore lifecycle | Implemented and automatically covered | Lifecycle states, failure recording, Chroma removal, retained-source rebuild, API tests, service tests, and live UI verification |
 | PDF, TXT, and DOCX validation and upload | Implemented | Upload API tests cover extension, media type, content validity, empty input, filename, and size boundaries; TXT requires UTF-8 and non-empty DOCX tables are rejected |
-| Canonical source metadata | Implemented locally | PostgreSQL records `source_uri`, `content_sha256`, and `file_size_bytes` for supported formats; storage remains local rather than production-durable |
+| Canonical source metadata and storage boundary | Partially abstracted, implemented locally | PostgreSQL records `source_uri`, `content_sha256`, and `file_size_bytes`; uploads and retained-source validation use injected storage, while extraction still expects a local path and `LocalSourceStorage` remains the only implementation |
 | Format-aware extraction and cleaning | Implemented | PDF pages, TXT lines, and DOCX body paragraphs retain their source boundaries through transform tests; DOCX manual line breaks are normalized inside their owning paragraph |
 | Source-location contract | Implemented | `Document`, `Chunk`, Chroma metadata, chat schemas, and frontend rendering require exactly one of page, line range, or paragraph range |
 | Overlapping chunk generation | Implemented | Chunk boundaries, overlap, indices, and page/line/paragraph metadata are automatically covered |
@@ -62,7 +64,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Subject-scoped retrieval | Implemented | Retriever and chat orchestration tests plus live local verification |
 | Answer and source rendering | Implemented | Frontend renders context-constrained answers with document plus page, line-range, or paragraph-range references |
 | Document deletion | Implemented and automatically covered | PDF, TXT, and DOCX lifecycle tests verify Chroma removal, PostgreSQL `DELETED` state, and post-delete retrieval behavior |
-| Retained-source Chroma rebuild | Implemented through subject restore | Automated multi-format rebuild tests, the earlier 12-chunk PDF recovery, and a live TXT trash/restore cycle preserve source identity and lineage |
+| Retained-source Chroma rebuild | Implemented through subject restore | Automated multi-format rebuild tests, the earlier 12-chunk PDF recovery, and live TXT trash/restore cycles preserve source identity and lineage; the latest cycle also verified retained-source hash, size, and cross-store identity |
 | Guarded legacy-source repair | Implemented operator workflow | Dry-run-first CLI, checksum and size verification, conflict protection, idempotent rerun tests, and live recovery evidence |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Cross-store reconciliation audit | Implemented operator workflow | Dry-run reporting classifies missing indexed documents, missing lineage, unknown documents, known non-expected documents, and subject mismatches; repair remains manual |
@@ -73,16 +75,28 @@ A live local recovery was verified on 2026-10-17 against the application state m
 
 ### Automated
 
-- The full backend suite passed locally at `2564cbd` with `240 passed` and one existing Starlette `TestClient` dependency deprecation warning.
+- The full backend suite passed locally against `main` at `e0d6afbef4fce5beef0b8008d144da5f843d6324` with `245 passed` and one existing Starlette `TestClient` dependency deprecation warning.
 - Frontend ESLint and the TypeScript/Vite production build passed locally with 180 modules transformed.
 - `tests/test_document_lifecycle_e2e.py` covers PDF, TXT, and DOCX subject creation, upload, `INDEXED` state, subject-scoped retrieval with format-aware source lineage, deletion, PostgreSQL lifecycle state, Chroma removal, repeated upload behavior, failed-document retry, and retained-source rebuild.
 - The lifecycle test uses SQLite in memory, an isolated temporary Chroma directory, real TXT reading and DOCX paragraph parsing, and deterministic substitutes for heavyweight PDF extraction, embedding, and answer generation.
-- Contract, loader, cleaner, chunker, repository, service, API, and CLI tests cover source-location validation, UTF-8 TXT lines, DOCX paragraph boundaries and manual line breaks, the explicit DOCX table rejection policy, canonical source metadata, sequential duplicate protection, retained-source retry, processing heartbeats, stale-ingestion recovery, subject trash and restore, guarded legacy-source repair, and PostgreSQL-Chroma reconciliation reporting.
+- Contract, loader, cleaner, chunker, repository, storage, service, API, and CLI tests cover source-location validation, UTF-8 TXT lines, DOCX paragraph boundaries and manual line breaks, the explicit DOCX table rejection policy, canonical source metadata, local source-storage conflict and read behavior, injected retained-source validation, sequential duplicate protection, retained-source retry, processing heartbeats, stale-ingestion recovery, subject trash and restore, guarded legacy-source repair, and PostgreSQL-Chroma reconciliation reporting.
 - Legacy-source repair tests cover dry run, explicit apply, source changes after planning, conflicting target files, conflicting PostgreSQL metadata, missing documents, and idempotent reruns.
-- GitHub Actions backend and frontend checks passed through PR #28. The multi-format commit `2564cbd` is locally verified but has not yet passed CI.
+- GitHub Actions backend and frontend checks passed through PR #30, including the multi-format ingestion and local source-storage boundary changes.
 - CI does not run live PostgreSQL, Chroma, embedding, and Gemini together as one external integration workflow.
 
 ### Manual local end-to-end
+
+Verified on 2026-10-19 against `main` at `e0d6afbef4fce5beef0b8008d144da5f843d6324`:
+
+- Created subject `7bc902ef-1388-4db6-bb93-a0d3b3b84de9` and uploaded the UTF-8 TXT fixture `phase2-recovery-evidence.txt`.
+- The upload created document `e53423ba-4577-4cc4-8b50-d8cdecfa9e07`, reached `INDEXED`, and produced one Chroma chunk with source line range 1-3.
+- A live subject-scoped question returned an answer citing the same document identity and line range.
+- Moving the subject to Trash changed it to `DELETED`, processed one document, removed one Chroma chunk, and caused chat to return `409 Subject is not active`.
+- Restoring the subject returned it to `ACTIVE`, processed one retained document, and rebuilt one Chroma chunk.
+- The post-restore query returned an answer with the same `document_id` and line range 1-3.
+- A direct cross-store check confirmed `document_status=INDEXED`, no active processing stage, matching retained-source SHA-256 and file size, and exactly one Chroma chunk scoped to the expected subject.
+
+Result: **passed**.
 
 Verified on 2026-10-17 against `main` at `49fd465185d76918802626ab228308a0ebe0346b`:
 
@@ -116,15 +130,15 @@ Result: **passed**.
 | --- | --- | --- |
 | Subject and document metadata | PostgreSQL | No production backup or restore procedure yet |
 | Document and subject lifecycle state | PostgreSQL | Recovery workflows are operator-invoked rather than scheduled |
-| Accepted PDF, TXT, and DOCX sources | Local canonical upload storage | Rebuildable locally, but not durable across machine or disk loss |
+| Accepted PDF, TXT, and DOCX sources | `LocalSourceStorage`-backed canonical upload storage | Storage writes and retained-source reads have an interface boundary, but extraction still expects local paths and the files are not durable across machine or disk loss |
 | Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation detects drift but does not repair it automatically |
 | Generated answers | API response | Not treated as a durable application record |
 
-PostgreSQL is the system of record for identity, metadata, and lifecycle state. Chroma is a derived retrieval index. Chroma can be audited against PostgreSQL and rebuilt through subject restore when a valid retained source exists. The current recovery guarantee remains local because canonical source files are stored on the application machine rather than in durable object storage.
+PostgreSQL is the system of record for identity, metadata, and lifecycle state. Chroma is a derived retrieval index. Chroma can be audited against PostgreSQL and rebuilt through subject restore when a valid retained source exists. The storage boundary removes direct filesystem writes from the upload API and direct retained-source reads from lifecycle validation, but the current recovery guarantee remains local because extraction still consumes a filesystem path and canonical files remain on the application machine.
 
 ## Known limitations
 
-- Canonical source files are retained locally instead of in durable object storage.
+- `LocalSourceStorage` is the only source-storage implementation. Upload and retained-source validation use the boundary, but extraction still treats `source_uri` as a local filesystem path, so remote object storage is not yet plug-compatible.
 - Duplicate-safe behavior covers sequential requests and failed retries; concurrent-request uniqueness is not enforced at the database level.
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
 - PostgreSQL-Chroma reconciliation detects and classifies drift but does not repair it automatically.
@@ -138,12 +152,14 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Move canonical source retention from local disk to durable object storage with backup and retention policies.
-2. Add database-level protection for concurrent duplicate ingestion and schedule stale-ingestion recovery.
-3. Add guarded PostgreSQL-Chroma repair actions on top of the existing reconciliation audit.
-4. Create a small multi-format retrieval and answer-quality evaluation dataset with relevance, citation-correctness, and faithfulness checks.
-5. Expand TXT encoding and DOCX structure support only when concrete source requirements justify the added parsing policy.
-6. Add health checks and structured operational diagnostics.
+1. Complete path-independent source access so extraction and rebuild consume source bytes or controlled temporary materialization through the storage interface instead of treating `source_uri` as a local path.
+2. Add MinIO as the second local source-storage implementation, using stable object keys and preserving URI, SHA-256, and file size in PostgreSQL.
+3. Migrate existing local sources with a dry-run-first workflow, per-file hash comparison, MinIO read-back verification, and no local deletion before successful verification.
+4. Prove Chroma rebuild from MinIO with the same document identity, including missing objects, hash mismatches, temporary MinIO unavailability, and idempotent reruns.
+5. Add database-level protection for concurrent duplicate ingestion and schedule stale-ingestion recovery.
+6. Add guarded PostgreSQL-Chroma repair actions on top of the existing reconciliation audit.
+7. Create a small multi-format retrieval and answer-quality evaluation dataset with relevance, citation-correctness, and faithfulness checks.
+8. Before private beta, establish independent PostgreSQL and source-file backups, test restoration from those backups, then add authentication and authorization.
 
 ## Update policy
 

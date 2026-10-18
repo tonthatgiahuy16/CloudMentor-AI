@@ -10,28 +10,37 @@ Data Engineering is the backbone of the project. The main concerns are ingestion
 
 ## Current milestone
 
-CloudMentor AI currently implements the components required for a local vertical slice:
+CloudMentor AI currently implements a recoverable, subject-scoped local RAG lifecycle for PDF, UTF-8 TXT, and body-paragraph DOCX sources:
 
 ```text
 create subject
-    -> upload PDF
-    -> extract, clean, chunk, embed, and index
-    -> track document lifecycle in PostgreSQL
+    -> validate and retain a canonical source
+    -> record source URI, SHA-256, and file size in PostgreSQL
+    -> extract, clean, and preserve page, line, or paragraph locations
+    -> chunk, embed, and index with source lineage
+    -> track processing and document lifecycle in PostgreSQL
     -> ask a subject-scoped question
     -> return an answer constrained by retrieved context
-    -> show document and page references
-    -> delete the document from active retrieval
+    -> show document plus page, line-range, or paragraph-range references
+    -> delete a document from active retrieval
+       or move a subject to Trash
+           -> remove its derived Chroma vectors
+           -> retain PostgreSQL metadata and canonical source files
+           -> restore the subject by rebuilding Chroma
 ```
 
-The complete sequence above was verified manually on commit [`89fd45d`](https://github.com/tonthatgiahuy16/CloudMentor-AI/commit/89fd45dda10212c866f7baaa4ea85d0b00e37e46) on 2026-10-07. It has not yet been captured as an automated reproducible end-to-end test, so the project does not claim production readiness.
+The lifecycle is covered by automated application-level tests and recorded live local verification. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: source storage is still local, remote object storage is not yet plug-compatible, and several operational and security boundaries remain.
 
 ## What this project demonstrates
 
 - A modular **Extract -> Transform -> Chunk -> Embed -> Index** pipeline.
-- Page-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
+- Page-, line-, paragraph-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
 - PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
 - Subject-scoped retrieval to keep queries inside the selected knowledge domain.
-- Context-constrained LLM answers with document and page references.
+- Context-constrained LLM answers with format-aware source references.
+- Duplicate-safe sequential ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
+- A read-only PostgreSQL-Chroma reconciliation audit and guarded legacy-source repair workflow.
+- An injectable source-storage boundary with a local implementation for canonical source writes and retained-source validation.
 - Clear boundaries between API, services, repositories, pipeline stages, retrieval, and generation.
 - Dependency injection that allows API and orchestration tests to run without live external services.
 - Automated backend and frontend checks in GitHub Actions.
@@ -42,7 +51,8 @@ The complete sequence above was verified manually on commit [`89fd45d`](https://
 | --- | --- | --- |
 | API | FastAPI | Upload, document, subject, and chat endpoints |
 | Relational storage | PostgreSQL + SQLAlchemy | Document metadata and lifecycle state |
-| PDF extraction | PyMuPDF | Page-level text extraction |
+| Source extraction | PyMuPDF, UTF-8 text loading, python-docx | PDF pages, TXT lines, and DOCX body paragraphs |
+| Source files | Local source-storage implementation | Canonical source retention for retry and rebuild |
 | Embeddings | BGE-M3 | Document and query vector generation |
 | Vector index | Chroma | Similarity search over derived chunk embeddings |
 | Generation | Gemini | Answer generation from retrieved context |
@@ -52,13 +62,14 @@ The complete sequence above was verified manually on commit [`89fd45d`](https://
 ## Data flow
 
 ```text
-PDF upload
-    -> validate extension, MIME type, signature, filename, and size
-    -> retain the accepted PDF in local upload storage
+PDF, UTF-8 TXT, or body-paragraph DOCX upload
+    -> validate extension, media type, content, filename, and size
+    -> retain the accepted source through the local storage boundary
+    -> record source URI, SHA-256, and file size
     -> create PostgreSQL document record as UPLOADED
     -> mark PROCESSING
-    -> extract text by page
-    -> normalize text
+    -> extract text by page, line, or paragraph
+    -> normalize text without losing source boundaries
     -> create overlapping chunks with lineage metadata
     -> generate embeddings
     -> write derived vectors and metadata to Chroma
@@ -67,11 +78,21 @@ PDF upload
 Pipeline failure
     -> record FAILED status, failure stage, and error details
 
-Question + optional subject_id
+Question + required subject_id
     -> embed question
-    -> retrieve matching chunks, filtered by subject when selected
+    -> retrieve matching chunks filtered by subject
     -> generate an answer constrained by retrieved context
-    -> return answer plus document and page references
+    -> return answer plus document and format-aware location references
+
+Subject moved to Trash
+    -> mark the subject DELETED in PostgreSQL
+    -> remove its derived Chroma chunks
+    -> retain document records, canonical source files, and source metadata
+
+Subject restore
+    -> validate each retained source through the storage boundary
+    -> rebuild Chroma under the original document identity
+    -> return the subject to ACTIVE when recovery succeeds
 ```
 
 ## Architecture
@@ -79,15 +100,18 @@ Question + optional subject_id
 ```mermaid
 flowchart LR
     UI[React frontend] --> API[FastAPI]
-    API --> SUBJECTS[Subject service]
+    API --> SUBJECTS[Subject lifecycle service]
     API --> UPLOAD[Upload service]
     API --> CHAT[Chat service]
     API --> DOCS[Document service]
 
     SUBJECTS --> PG[(PostgreSQL\nmetadata + lifecycle)]
     DOCS --> PG
-    UPLOAD --> FILES[(Local upload storage\nretained source PDFs)]
+    UPLOAD --> STORAGE[Source-storage boundary]
+    STORAGE --> FILES[(LocalSourceStorage\nretained PDF / TXT / DOCX)]
     UPLOAD --> PIPELINE[Extract -> Transform -> Chunk -> Embed]
+    SUBJECTS --> PIPELINE
+    SUBJECTS --> CHROMA
     PIPELINE --> CHROMA[(Chroma\nderived retrieval index)]
     UPLOAD --> PG
 
@@ -96,39 +120,44 @@ flowchart LR
     CHAT --> UI
 ```
 
-The local upload directory currently retains successfully ingested PDFs, but it is not yet a durable production storage contract.
+Canonical sources are written and validated through an injectable storage interface, currently implemented only by `LocalSourceStorage`. Extraction still consumes a local filesystem path, so MinIO or another remote object store cannot yet be substituted without completing path-independent reads or controlled temporary materialization.
 
 ## Data ownership and recovery boundary
 
 | Data | Current owner | Recovery meaning |
 | --- | --- | --- |
 | Subject, document metadata, and lifecycle state | PostgreSQL | System of record for operational state |
-| Accepted source PDF | Local upload storage | Retained locally after successful ingestion; not yet durable storage |
+| Accepted PDF, TXT, and DOCX sources | `LocalSourceStorage` | Retained for retry and rebuild, but still tied to the application machine |
 | Chunk embeddings and retrieval metadata | Chroma | Derived index used for retrieval |
 | Generated answer | API response | Not currently treated as a durable record |
 
-PostgreSQL is the system of record for document metadata and lifecycle state. Chroma is a derived retrieval index. Automated index rebuilding is not yet implemented and remains part of the recovery roadmap.
+PostgreSQL is the system of record for document identity, source metadata, and lifecycle state. Chroma is a derived retrieval index. Subject restore can rebuild Chroma from locally retained canonical sources while preserving `document_id`, and the reconciliation audit can report drift between the two stores.
 
-A reliable rebuild also requires a durable canonical content source. The project must eventually formalize one of these approaches:
-
-1. Store original PDFs in durable object storage, with URI and checksum recorded in PostgreSQL.
-2. Store canonical extracted content or chunks in PostgreSQL or object storage.
-
-Until one of those contracts and an automated rebuild workflow are implemented, Chroma is only **designed to be rebuildable**; it is not yet operationally rebuildable.
+The current recovery guarantee is local rather than production-durable. The next storage milestone is to complete path-independent source access, add MinIO as a second implementation, migrate existing sources with checksum verification, and prove rebuild behavior against missing, changed, or temporarily unavailable objects.
 
 ## Document lifecycle
 
 ```text
+Document lifecycle:
 UPLOADED -> PROCESSING -> INDEXED
                       \-> FAILED
+INDEXED or FAILED -> DELETED
+
+Subject lifecycle:
+ACTIVE -> DELETING -> DELETED
+                    \-> DELETE_FAILED
+DELETED -> RESTORING -> ACTIVE
+                     \-> RESTORE_FAILED
 ```
 
 - `UPLOADED`: the file passed API validation and a document record was created.
 - `PROCESSING`: extraction, transformation, embedding, or indexing is running.
 - `INDEXED`: vector entries were written successfully.
 - `FAILED`: the failed stage and error details were recorded for diagnosis.
+- Document `DELETED`: the document is excluded from active use; there is no individual-document restore endpoint.
+- Subject `DELETED`: the subject is hidden from active use while its non-deleted document records and retained sources remain available for subject restore.
 
-Deletion removes the document from the active application view and retrieval path. Cross-store reconciliation and automated recovery remain roadmap items.
+Document deletion and subject trash remove derived records from active retrieval. Subject restore rebuilds retained documents, while the PostgreSQL-Chroma reconciliation workflow reports missing lineage, missing indexed documents, unknown documents, known non-expected documents, and subject mismatches. Reconciliation repair remains manual.
 
 ## Traceability
 
@@ -137,11 +166,11 @@ The ingestion path carries metadata needed to trace a retrieval result back to t
 - `document_id`
 - `subject_id`
 - `source`
-- `page`
+- exactly one source location: `page`, `line_range`, or `paragraph_range`
 - `chunk_index`
 - vector distance
 
-The chat API returns document and page references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. Retrieval quality, citation correctness, and answer faithfulness still require a benchmark and evaluation dataset.
+The chat API returns document and format-aware location references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. Retrieval quality, citation correctness, and answer faithfulness still require a benchmark and evaluation dataset.
 
 ## API surface
 
@@ -149,8 +178,11 @@ The chat API returns document and page references alongside the answer. These re
 | --- | --- | --- |
 | `GET` | `/` | API root message |
 | `GET` | `/subjects/` | List subjects |
+| `GET` | `/subjects/trash` | List recoverable subjects in Trash |
 | `POST` | `/subjects/` | Create a subject |
-| `POST` | `/upload/` | Validate and ingest a PDF |
+| `DELETE` | `/subjects/{subject_id}` | Move a subject to Trash and remove derived chunks |
+| `POST` | `/subjects/{subject_id}/restore` | Rebuild retained documents and restore a subject |
+| `POST` | `/upload/` | Validate and ingest a PDF, UTF-8 TXT, or body-paragraph DOCX |
 | `GET` | `/documents/` | List active documents |
 | `GET` | `/documents/{document_id}` | Read document metadata |
 | `DELETE` | `/documents/{document_id}` | Remove a document from active use |
@@ -163,11 +195,12 @@ Interactive API documentation is available at `http://127.0.0.1:8000/docs` while
 ## Frontend capabilities
 
 - List documents and their processing status.
-- Upload a PDF for a selected subject and chapter.
+- Upload a PDF, UTF-8 TXT, or body-paragraph DOCX for a selected subject and optional chapter.
 - Create a new subject from the document workspace.
 - Delete a document.
 - Select a subject before asking a question.
-- Render the answer and its document/page references.
+- Move subjects to Trash and restore them from retained sources.
+- Render the answer and its document plus page, line-range, or paragraph-range references.
 
 ## Verification status
 
@@ -191,8 +224,10 @@ CloudMentor-AI/
 |   |-- rag/             # loader, chunker, embedder, retriever, vector store
 |   |-- repos/           # persistence access
 |   |-- schemas/         # API request and response models
-|   `-- services/        # application orchestration
+|   |-- services/        # application orchestration
+|   `-- storage/         # source-storage interfaces and implementations
 |-- docs/
+|   |-- PROJECT_GOALS.md
 |   |-- PROJECT_STATUS.md
 |   `-- TARGET_ARCHITECTURE.md
 |-- frontend/            # React + TypeScript client
@@ -285,9 +320,10 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 ## Current limitations
 
-- Source PDFs are retained on local disk rather than durable object storage.
-- Automated Chroma rebuild and PostgreSQL-Chroma reconciliation are not implemented.
-- Ingestion is not yet fully idempotent across retries and partial failures.
+- `LocalSourceStorage` is the only source-storage implementation, and extraction still treats `source_uri` as a local filesystem path.
+- Canonical source files are not durable across application-machine or disk loss; MinIO migration and independent backups are not implemented.
+- PostgreSQL-Chroma reconciliation detects drift but does not repair it automatically.
+- Sequential duplicate ingestion and failed retries are guarded, but concurrent-request uniqueness is not enforced at the database level.
 - Retrieval quality and answer faithfulness have not been benchmarked.
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
 - Authentication, authorization, rate limiting, observability, and production deployment are not implemented.
@@ -297,7 +333,7 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 - PostgreSQL owns metadata and lifecycle state.
 - Chroma is a derived retrieval index, not the source of truth.
-- Every chunk should preserve lineage back to its subject, document, page, and chunk position.
+- Every chunk should preserve lineage back to its subject, document, exactly one format-aware source location, and chunk position.
 - Pipeline stages should be independently testable and observable.
 - Recovery claims must be backed by durable source data and a tested procedure.
 - New infrastructure should be introduced only when the workload justifies it.
