@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-
+from typing import Protocol
 
 @dataclass(frozen=True)
 
@@ -12,7 +12,31 @@ class StoredSource:
     file_size_bytes: int
 
 
-class SourceConflictError(RuntimeError):
+class SourceStorage(Protocol):
+    def store(
+        self,
+        *,
+        document_id: str,
+        filename: str,
+        data: bytes,
+    ) -> StoredSource:
+        ...
+
+    def read_bytes(
+        self,
+        source_uri: str,
+    ) -> bytes:
+        ...
+
+class SourceStorageError(RuntimeError):
+    pass
+
+
+class SourceNotFoundError(SourceStorageError):
+    pass
+
+
+class SourceConflictError(SourceStorageError):
     pass
 
 

@@ -32,4 +32,6 @@ python_files = [
   "test_extract_pipeline.py",
   "test_source_storage.py",
   "test_recover_stale_ingestions_script.py",
+  "test_minio_source_storage.py",
+  "test_source_storage_factory.py",
 ]
