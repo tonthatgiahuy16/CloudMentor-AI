@@ -23,6 +23,7 @@ from app.api.upload import (
     get_pdf_service,
     get_upload_dir,
     get_upload_subject_repository,
+    get_source_storage,
     router as upload_router,
 )
 from app.models.chunk import Chunk
@@ -53,6 +54,11 @@ from app.rag.loader import (
     read_docx_paragraphs,
 )
 
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
+
+
 class LifecyclePDFService:
     """
     Thay thế các bước xử lý nặng trong test nhưng vẫn ghi vào
@@ -63,9 +69,11 @@ class LifecyclePDFService:
         self,
         document_repo,
         vector_store,
+        source_storage,
     ):
         self.document_repo = document_repo
         self.vector_store = vector_store
+        self.source_storage = source_storage
 
     def find_active_duplicate(
         self,
@@ -83,23 +91,23 @@ class LifecyclePDFService:
 
     def upload(
         self,
-        path,
+        source_uri,
         *,
         subject_id,
         chapter,
         document_id,
         original_filename,
-        source_uri,
         content_sha256,
         file_size_bytes,
     ):
-        source_path = Path(path)
 
-        if not source_path.exists():
-            raise RuntimeError("Uploaded document was not saved")
+        source_data = self.source_storage.read_bytes(
+            source_uri
+        )
 
         file_type = (
-            source_path.suffix
+            Path(original_filename)
+            .suffix
             .lstrip(".")
             .lower()
         )
@@ -117,7 +125,7 @@ class LifecyclePDFService:
         self.document_repo.mark_processing(document_id)
 
         if file_type == "txt":
-            lines = source_path.read_text(
+            lines = source_data.decode(
                 encoding="utf-8"
             ).splitlines()
 
@@ -128,7 +136,7 @@ class LifecyclePDFService:
 
         elif file_type == "docx":
             paragraphs = read_docx_paragraphs(
-                source_path
+                BytesIO(source_data)
             )
 
             chunk_text = "\n".join(paragraphs)
@@ -145,7 +153,7 @@ class LifecyclePDFService:
                 "resources on demand."
             )
             source_location = {
-                "page" : 1,
+                "page": 1,
             }
 
         chunk = Chunk(
@@ -175,12 +183,9 @@ class LifecyclePDFService:
         self,
         document,
     ):
-        source_path = Path(document.source_uri)
-
-        if not source_path.exists():
-            raise RuntimeError(
-                "Retained document does not exist"
-            )
+        source_data = self.source_storage.read_bytes(
+            document.source_uri
+        )
 
         self.vector_store.delete_by_document_id(
             document.document_id
@@ -189,14 +194,10 @@ class LifecyclePDFService:
             document.document_id
         )
 
-        file_type = (
-            source_path.suffix
-            .lstrip(".")
-            .lower()
-        )
+        file_type = document.file_type
 
         if file_type == "txt":
-            lines = source_path.read_text(
+            lines = source_data.decode(
                 encoding="utf-8"
             ).splitlines()
 
@@ -207,7 +208,7 @@ class LifecyclePDFService:
 
         elif file_type == "docx":
             paragraphs = read_docx_paragraphs(
-                source_path
+                BytesIO(source_data)
             )
 
             chunk_text = "\n".join(paragraphs)
@@ -309,9 +310,14 @@ def client(tmp_path, monkeypatch):
 
     document_repo = DocumentRepository(db_session)
 
+    source_storage = LocalSourceStorage(
+        root=tmp_path
+    )
+
     pdf_service = LifecyclePDFService(
         document_repo,
         vector_store,
+        source_storage,
     )
 
     chat_service = ChatService(
@@ -334,6 +340,10 @@ def client(tmp_path, monkeypatch):
     app.include_router(upload_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
+
+    app.dependency_overrides[
+        get_source_storage
+    ] = lambda: source_storage
 
     app.dependency_overrides[get_pdf_service] = (
         lambda: pdf_service

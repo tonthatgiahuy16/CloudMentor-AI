@@ -31,4 +31,5 @@ python_files = [
   "test_source_location_contract.py",
   "test_extract_pipeline.py",
   "test_source_storage.py",
+  "test_recover_stale_ingestions_script.py",
 ]
