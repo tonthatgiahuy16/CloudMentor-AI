@@ -16,7 +16,10 @@ from fastapi import (
 )
 
 from app.storage.source_storage import (
-    LocalSourceStorage,
+    SourceStorage,
+)
+from app.storage.source_storage_factory import (
+    create_source_storage,
 )
 from app.core.database import SessionLocal
 from app.repos.document_repository import DocumentRepository
@@ -66,10 +69,8 @@ def get_upload_dir() -> Path:
     )
 
 
-def get_source_storage(
-    upload_dir: Path = Depends(get_upload_dir),
-) -> LocalSourceStorage:
-    return LocalSourceStorage(root=upload_dir)
+def get_source_storage() -> SourceStorage:
+    return create_source_storage()
 
 
 def get_pdf_service(

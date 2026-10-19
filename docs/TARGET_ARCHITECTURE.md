@@ -235,6 +235,7 @@ Problem -> Root cause -> Design decision -> Trade-off
 | **FastAPI** | Backend API layer | Typed contracts, validation, and async-friendly APIs | API should remain thin; long processing belongs in workers | Implemented baseline |
 | **PostgreSQL** | Relational system of record | Transactions, constraints, joins, and canonical lifecycle state | Not the primary semantic vector-serving layer | Implemented baseline |
 | **Chroma** | Vector serving index | Simple embedding storage, similarity search, and metadata filtering | Derived index; not the source of truth for business data | Implemented baseline |
+| **MinIO** | Canonical source object-storage adapter | Stable object keys and S3-compatible byte access support retry and Chroma rebuild without filesystem-path coupling | Verified as a local adapter; migration, independent backups, and production operations remain | Implemented local adapter |
 | **Kafka** | Event transport and streaming backbone | Decoupling, buffering, replay, partitioning, and consumer scaling | Adds operational complexity; only justified by real async/scale requirements | Planned |
 | **Spark** | Distributed batch/stream processing | Large-scale joins, aggregation, Structured Streaming, and feature engineering | Unnecessary overhead for small single-node workloads | Planned |
 | **Gemini** | Context-constrained answer generation | Generates natural-language answers from retrieved context | Does not own knowledge, lifecycle, or canonical data | Implemented baseline |
@@ -244,6 +245,7 @@ Problem -> Root cause -> Design decision -> Trade-off
 ### Core architecture decisions
 
 - **PostgreSQL is the system of record; Chroma is a derived serving index designed to be rebuildable once durable canonical content and an automated rebuild workflow exist.**
+- **Canonical source storage is selected behind one contract; application services consume source bytes rather than storage-specific paths or SDKs.**
 - **Kafka transports events; it does not replace transactional storage.**
 - **Spark processes data; it does not serve application requests.**
 - **Gemini generates answers; retrieved context supplies the knowledge.**
@@ -254,12 +256,12 @@ Problem -> Root cause -> Design decision -> Trade-off
 
 Current setup and test instructions live in the repository [`README`](../README.md). Verified implementation status and evidence live in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
 
-### Planned phases
+### Delivery phases
 
 | Phase | Status | Completion boundary |
 | --- | --- | --- |
-| Phase 1 — Core Data Foundation and RAG | In progress | Reproducible document upload → indexed state → scoped answer with source → delete; stable identity and stage contracts; automated coverage for the full local lifecycle. Manual verification alone is recorded separately. |
-| Phase 2 — Reliability and Multi-source Ingestion | Planned | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, idempotency, cross-store reconciliation, and tested delete/rebuild recovery. PostgreSQL registry work already present in the baseline is not counted as new work. |
+| Phase 1 — Core Data Foundation and RAG | Implemented baseline | Reproducible document upload → indexed state → scoped answer with source → delete; stable identity and stage contracts; automated coverage for the full local lifecycle. Manual verification is recorded separately. |
+| Phase 2 — Reliability and Multi-source Ingestion | Implemented local baseline | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, idempotency, cross-store reconciliation, and tested delete/rebuild recovery. Local-filesystem and MinIO adapters are implemented; migration, independent backups, and production operations remain separate work. |
 | Phase 3 — Quiz and Learning Application | Planned | Users, quizzes, questions, attempts, answers, scores, and progress create complete, queryable learning records linked to their subject or topic. |
 | Phase 4 — Event-driven Processing with Kafka | Planned | A documented workload justifies asynchronous processing; versioned events can be replayed, consumers handle duplicates and failures, and upload latency or independent scaling is measured. |
 | Phase 5 — Distributed Analytics with Spark | Planned | Batch or streaming jobs produce validated curated datasets and versioned features with lineage; scale or latency benefit is measured against a simpler baseline. |

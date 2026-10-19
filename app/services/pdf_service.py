@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.storage.source_storage import (
     LocalSourceStorage,
+    SourceStorage,
 )
 
 
@@ -17,7 +18,7 @@ class PDFService:
     def __init__(
         self,
         document_repo,
-        source_storage=None,
+        source_storage: SourceStorage | None = None,
     ):
         from app.pipeline.chunk_pipeline import (
             ChunkPipeline,

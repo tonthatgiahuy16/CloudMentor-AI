@@ -81,3 +81,26 @@ def test_apply_injects_source_storage_into_pdf_service(
         pdf_service=pdf_service,
     )
     db.close.assert_called_once_with()
+
+
+def test_get_source_storage_uses_factory(
+    monkeypatch,
+):
+    source_storage = Mock()
+    storage_factory = Mock(
+        return_value=source_storage
+    )
+
+    monkeypatch.setattr(
+        recovery_script,
+        "create_source_storage",
+        storage_factory,
+        raising=False,
+    )
+
+    result = (
+        recovery_script.get_source_storage()
+    )
+
+    assert result is source_storage
+    storage_factory.assert_called_once_with()

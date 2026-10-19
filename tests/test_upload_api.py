@@ -6,6 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import app.api.upload as upload_api
 from app.api.upload import (
     get_pdf_service,
     get_upload_dir,
@@ -789,3 +790,24 @@ def test_get_pdf_service_injects_source_storage(
 
     dependency.close()
     db.close.assert_called_once_with()
+
+
+def test_get_source_storage_uses_factory(
+    monkeypatch,
+):
+    source_storage = Mock()
+    storage_factory = Mock(
+        return_value=source_storage
+    )
+
+    monkeypatch.setattr(
+        upload_api,
+        "create_source_storage",
+        storage_factory,
+        raising=False,
+    )
+
+    result = get_source_storage()
+
+    assert result is source_storage
+    storage_factory.assert_called_once_with()

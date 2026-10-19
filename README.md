@@ -10,7 +10,7 @@ Data Engineering is the backbone of the project. The main concerns are ingestion
 
 ## Current milestone
 
-CloudMentor AI currently implements a recoverable, subject-scoped local RAG lifecycle for PDF, UTF-8 TXT, and body-paragraph DOCX sources:
+CloudMentor AI currently implements a recoverable, subject-scoped RAG lifecycle for PDF, UTF-8 TXT, and body-paragraph DOCX sources with configurable local-filesystem or MinIO source storage:
 
 ```text
 create subject
@@ -29,7 +29,7 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The lifecycle is covered by automated application-level tests and recorded live local verification. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: source storage is still local, remote object storage is not yet plug-compatible, and several operational and security boundaries remain.
+The lifecycle is covered by automated application-level tests and recorded live local verification. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: MinIO is verified as a second local adapter for new uploads, but existing sources have not been migrated, independent backups are not established, and several operational and security boundaries remain.
 
 ## What this project demonstrates
 
@@ -40,7 +40,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 - Context-constrained LLM answers with format-aware source references.
 - Duplicate-safe sequential ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
 - A read-only PostgreSQL-Chroma reconciliation audit and guarded legacy-source repair workflow.
-- An injectable source-storage boundary with a local implementation for canonical source writes and retained-source validation.
+- An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
 - Clear boundaries between API, services, repositories, pipeline stages, retrieval, and generation.
 - Dependency injection that allows API and orchestration tests to run without live external services.
 - Automated backend and frontend checks in GitHub Actions.
@@ -52,7 +52,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 | API | FastAPI | Upload, document, subject, and chat endpoints |
 | Relational storage | PostgreSQL + SQLAlchemy | Document metadata and lifecycle state |
 | Source extraction | PyMuPDF, UTF-8 text loading, python-docx | PDF pages, TXT lines, and DOCX body paragraphs |
-| Source files | Local source-storage implementation | Canonical source retention for retry and rebuild |
+| Source files | Local filesystem or MinIO through a shared storage contract | Canonical source retention for retry and rebuild |
 | Embeddings | BGE-M3 | Document and query vector generation |
 | Vector index | Chroma | Similarity search over derived chunk embeddings |
 | Generation | Gemini | Answer generation from retrieved context |
@@ -64,7 +64,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 ```text
 PDF, UTF-8 TXT, or body-paragraph DOCX upload
     -> validate extension, media type, content, filename, and size
-    -> retain the accepted source through the local storage boundary
+    -> retain the accepted source through the configured storage adapter
     -> record source URI, SHA-256, and file size
     -> create PostgreSQL document record as UPLOADED
     -> mark PROCESSING
@@ -109,6 +109,7 @@ flowchart LR
     DOCS --> PG
     UPLOAD --> STORAGE[Source-storage boundary]
     STORAGE --> FILES[(LocalSourceStorage\nretained PDF / TXT / DOCX)]
+    STORAGE --> MINIO[(MinioSourceStorage\nretained objects)]
     UPLOAD --> PIPELINE[Extract -> Transform -> Chunk -> Embed]
     SUBJECTS --> PIPELINE
     SUBJECTS --> CHROMA
@@ -120,20 +121,20 @@ flowchart LR
     CHAT --> UI
 ```
 
-Canonical sources are written and validated through an injectable storage interface, currently implemented only by `LocalSourceStorage`. Extraction still consumes a local filesystem path, so MinIO or another remote object store cannot yet be substituted without completing path-independent reads or controlled temporary materialization.
+Canonical sources are written and read through a shared storage interface implemented by `LocalSourceStorage` and `MinioSourceStorage`. Extraction consumes validated source bytes plus the filename and document type, so retry and rebuild do not depend on interpreting `source_uri` as a local path. The factory selects one adapter for upload, subject restore, and stale-ingestion recovery.
 
 ## Data ownership and recovery boundary
 
 | Data | Current owner | Recovery meaning |
 | --- | --- | --- |
 | Subject, document metadata, and lifecycle state | PostgreSQL | System of record for operational state |
-| Accepted PDF, TXT, and DOCX sources | `LocalSourceStorage` | Retained for retry and rebuild, but still tied to the application machine |
+| Accepted PDF, TXT, and DOCX sources | Configured `LocalSourceStorage` or `MinioSourceStorage` | Retained for retry and rebuild; MinIO is currently operated as a local service rather than independently backed-up production storage |
 | Chunk embeddings and retrieval metadata | Chroma | Derived index used for retrieval |
 | Generated answer | API response | Not currently treated as a durable record |
 
-PostgreSQL is the system of record for document identity, source metadata, and lifecycle state. Chroma is a derived retrieval index. Subject restore can rebuild Chroma from locally retained canonical sources while preserving `document_id`, and the reconciliation audit can report drift between the two stores.
+PostgreSQL is the system of record for document identity, source metadata, and lifecycle state. Chroma is a derived retrieval index. Subject restore can rebuild Chroma from canonical bytes read through either storage adapter while preserving `document_id`, and the reconciliation audit can report drift between PostgreSQL and Chroma.
 
-The current recovery guarantee is local rather than production-durable. The next storage milestone is to complete path-independent source access, add MinIO as a second implementation, migrate existing sources with checksum verification, and prove rebuild behavior against missing, changed, or temporarily unavailable objects.
+The current MinIO recovery guarantee is verified locally rather than production-durable. The next storage milestones are to migrate existing local sources with read-back checksum verification, exercise missing, changed, and temporarily unavailable objects, and establish independent source-file and PostgreSQL backups.
 
 ## Document lifecycle
 
@@ -268,6 +269,12 @@ python -m uvicorn app.main:app --reload
 
 Do not commit `.env`, API keys, passwords, or connection strings.
 
+### Source storage
+
+`CLOUDMENTOR_SOURCE_STORAGE` selects the source adapter. The default is `local`, using `CLOUDMENTOR_UPLOAD_DIR`. Set it to `minio` only after a MinIO server and bucket already exist, then provide the endpoint, access key, secret key, bucket, and secure-transport flag shown in `.env.example`.
+
+The application does not create the bucket, migrate existing local sources, or delete local copies automatically. Credentials belong in environment variables or an uncommitted `.env` file; never place real values in source control.
+
 ### Frontend
 
 ```powershell
@@ -320,8 +327,10 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 ## Current limitations
 
-- `LocalSourceStorage` is the only source-storage implementation, and extraction still treats `source_uri` as a local filesystem path.
-- Canonical source files are not durable across application-machine or disk loss; MinIO migration and independent backups are not implemented.
+- MinIO applies to newly stored sources when selected; existing `LocalSourceStorage` files have not been migrated.
+- The verified MinIO instance is local and does not replace independent source-file and PostgreSQL backups.
+- Missing objects are translated at the adapter boundary, but end-to-end recovery for missing or changed objects and temporary MinIO unavailability has not yet been exercised.
+- Live MinIO is verified manually rather than in GitHub Actions.
 - PostgreSQL-Chroma reconciliation detects drift but does not repair it automatically.
 - Sequential duplicate ingestion and failed retries are guarded, but concurrent-request uniqueness is not enforced at the database level.
 - Retrieval quality and answer faithfulness have not been benchmarked.

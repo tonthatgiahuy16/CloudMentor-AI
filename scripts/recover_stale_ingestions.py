@@ -1,8 +1,8 @@
-import os
-from pathlib import Path
-
 from app.storage.source_storage import (
-    LocalSourceStorage,
+    SourceStorage,
+)
+from app.storage.source_storage_factory import (
+    create_source_storage,
 )
 
 from argparse import (
@@ -21,15 +21,8 @@ from app.services.ingestion_recovery_service import (
 from app.services.pdf_service import PDFService
 
 
-def get_source_storage() -> LocalSourceStorage:
-    return LocalSourceStorage(
-        root=Path(
-            os.getenv(
-                "CLOUDMENTOR_UPLOAD_DIR",
-                "storage/uploads",
-            )
-        )
-    )
+def get_source_storage() -> SourceStorage:
+    return create_source_storage()
 
 
 def positive_minutes(value: str) -> int:
