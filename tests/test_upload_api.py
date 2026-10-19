@@ -45,19 +45,18 @@ class FakePDFService:
 
     def upload(
         self,
-        path,
+        source_uri,
         *,
         subject_id,
         chapter,
         document_id,
         original_filename,
-        source_uri=None,
         content_sha256=None,
         file_size_bytes=None,
     ):
         self.calls.append(
             (
-                Path(path),
+                Path(source_uri),
                 subject_id,
                 chapter,
                 document_id,
@@ -746,3 +745,47 @@ def test_upload_rejects_invalid_docx_before_writing(
     }
     assert service.calls == []
     assert not list(tmp_path.iterdir())
+
+
+def test_get_pdf_service_injects_source_storage(
+    monkeypatch,
+):
+    source_storage = Mock()
+    db = Mock()
+    document_repo = Mock()
+    pdf_service = Mock()
+
+    session_local = Mock(return_value=db)
+    document_repository_class = Mock(
+        return_value=document_repo
+    )
+    pdf_service_class = Mock(
+        return_value=pdf_service
+    )
+
+    monkeypatch.setattr(
+        "app.api.upload.SessionLocal",
+        session_local,
+    )
+    monkeypatch.setattr(
+        "app.api.upload.DocumentRepository",
+        document_repository_class,
+    )
+    monkeypatch.setattr(
+        "app.services.pdf_service.PDFService",
+        pdf_service_class,
+    )
+
+    dependency = get_pdf_service(
+        source_storage=source_storage
+    )
+
+    assert next(dependency) is pdf_service
+
+    pdf_service_class.assert_called_once_with(
+        document_repo,
+        source_storage=source_storage,
+    )
+
+    dependency.close()
+    db.close.assert_called_once_with()

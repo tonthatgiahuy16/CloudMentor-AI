@@ -136,14 +136,20 @@ class PDFService:
         self,
         document,
     ) -> int:
-        self._validate_retained_source(document)
+        source_data = (
+            self._validate_retained_source(
+                document
+            )
+        )
 
         self.index.delete_by_document_id(
             document.document_id
         )
 
         return self._process_document(
-            file_path=document.source_uri,
+            source_data=source_data,
+            filename=document.filename,
+            file_type=document.file_type,
             document_id=document.document_id,
             subject_id=document.subject_id,
         )
@@ -152,7 +158,7 @@ class PDFService:
     def _validate_retained_source(
         self,
         document,
-    ) -> None:
+    ) -> bytes:
         if (
             document.source_uri is None
             or document.content_sha256 is None
@@ -189,15 +195,16 @@ class PDFService:
                 "Retained source checksum does not match"
             )
 
+        return source_data
+
 
     def upload(
         self,
-        file_path: str,
+        source_uri: str,
         subject_id: str,
         chapter: int | None = None,
         document_id: str | None = None,
         original_filename: str | None = None,
-        source_uri: str | None = None,
         content_sha256: str | None = None,
         file_size_bytes: int | None = None,
         ):
@@ -205,9 +212,21 @@ class PDFService:
         if document_id is None:
             document_id = str(uuid4())
 
-        path = Path(file_path)
-        filename = original_filename or path.name
-        file_type = path.suffix.lstrip(".").lower()
+        if original_filename is None:
+            raise ValueError(
+                "Original filename is required"
+            )
+
+        source_data = self.source_storage.read_bytes(
+            source_uri
+        )
+        filename = original_filename
+        file_type = (
+            Path(filename)
+            .suffix
+            .lstrip(".")
+            .lower()
+        )
 
         self.document_repo.create(
             document_id=document_id,
@@ -220,7 +239,9 @@ class PDFService:
             file_size_bytes=file_size_bytes,
         )
         return self._process_document(
-            file_path=file_path,
+            source_data=source_data,
+            filename=filename,
+            file_type=file_type,
             document_id=document_id,
             subject_id=subject_id,
         )
@@ -229,7 +250,9 @@ class PDFService:
     def _process_document(
         self,
         *,
-        file_path: str,
+        source_data: bytes,
+        filename: str,
+        file_type: str,
         document_id: str,
         subject_id: str,
     ) -> int:
@@ -244,9 +267,11 @@ class PDFService:
                 stage=stage,
             )
             documents = self.extract.run(
-                file_path,
-                document_id,
-                subject_id,
+                source_data=source_data,
+                filename=filename,
+                file_type=file_type,
+                document_id=document_id,
+                subject_id=subject_id,
             )
 
             stage = "TRANSFORM"

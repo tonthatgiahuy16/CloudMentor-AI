@@ -1,7 +1,6 @@
-from pathlib import Path
 
 import pytest
-
+from io import BytesIO
 from app.rag import loader as loader_module
 from docx import Document as WordDocument
 from app.rag.loader import (
@@ -24,43 +23,56 @@ class FakeReader:
         self.pages = [FakePage("first page"), FakePage(None)]
 
 
-def test_loader_extracts_pages_and_metadata(tmp_path, monkeypatch):
-    pdf_path = tmp_path / "lesson.pdf"
-    pdf_path.write_bytes(b"%PDF-1.4")
-    monkeypatch.setattr(loader_module, "PdfReader", FakeReader)
+def test_pdf_loader_extracts_pages_from_bytes(
+    monkeypatch,
+):
+    source_data = b"%PDF-1.4"
 
-    documents = PDFLoader().load(str(pdf_path), document_id="doc-1", subject_id="subject-1")
+    monkeypatch.setattr(
+        loader_module,
+        "PdfReader",
+        FakeReader,
+    )
 
-    assert [document.text for document in documents] == ["first page", ""]
+    documents = PDFLoader().load(
+        source_data,
+        filename="lesson.pdf",
+        document_id="doc-1",
+        subject_id="subject-1",
+    )
+
+    assert [
+        document.text
+        for document in documents
+    ] == ["first page", ""]
+
     assert documents[0].source == "lesson.pdf"
     assert documents[0].page == 1
     assert documents[0].document_id == "doc-1"
     assert documents[0].subject_id == "subject-1"
 
 
-def test_loader_rejects_missing_file(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        PDFLoader().load(str(tmp_path / "missing.pdf"), document_id="doc-1", subject_id="subject-1")
+def test_loader_rejects_non_pdf():
+    with pytest.raises(
+        ValueError,
+        match="PDF",
+    ):
+        PDFLoader().load(
+            b"not a PDF source",
+            filename="lesson.txt",
+            document_id="doc-1",
+            subject_id="subject-1",
+        )
 
 
-def test_loader_rejects_non_pdf(tmp_path):
-    text_path = tmp_path / "lesson.txt"
-    text_path.write_text("content", encoding="utf-8")
-
-    with pytest.raises(ValueError, match="PDF"):
-        PDFLoader().load(str(text_path), document_id="doc-1", subject_id="subject-1")
-
-
-def test_text_loader_preserves_exact_line_locations(
-    tmp_path,
-):
-    text_path = tmp_path / "lesson.txt"
-    text_path.write_bytes(
+def test_text_loader_preserves_exact_line_locations():
+    source_data = (
         b"first line\r\n\r\nthird line\r\n"
     )
 
     documents = TextLoader().load(
-        str(text_path),
+        source_data,
+        filename="lesson.txt",
         document_id="doc-1",
         subject_id="subject-1",
     )
@@ -80,64 +92,47 @@ def test_text_loader_preserves_exact_line_locations(
     assert document.paragraph_range is None
 
 
-def test_text_loader_rejects_non_txt(
-    tmp_path,
-):
-    source_path = tmp_path / "lesson.pdf"
-    source_path.write_bytes(b"not a text file")
-
+def test_text_loader_rejects_non_txt():
     with pytest.raises(
         ValueError,
         match="TXT",
     ):
         TextLoader().load(
-            str(source_path),
+            b"not a text source",
+            filename="lesson.pdf",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_text_loader_rejects_empty_content(
-    tmp_path,
-):
-    text_path = tmp_path / "empty.txt"
-    text_path.write_text(
-        " \r\n\t\r\n",
-        encoding="utf-8",
-    )
-
+def test_text_loader_rejects_empty_content():
     with pytest.raises(
         ValueError,
         match="empty",
     ):
         TextLoader().load(
-            str(text_path),
+            b" \r\n\t\r\n",
+            filename="empty.txt",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_text_loader_rejects_invalid_utf8(
-    tmp_path,
-):
-    text_path = tmp_path / "invalid.txt"
-    text_path.write_bytes(b"\xff\xfe\xfa")
-
+def test_text_loader_rejects_invalid_utf8():
     with pytest.raises(
         ValueError,
         match="valid UTF-8",
     ):
         TextLoader().load(
-            str(text_path),
+            b"\xff\xfe\xfa",
+            filename="invalid.txt",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_docx_loader_preserves_exact_paragraph_locations(
-    tmp_path,
-):
-    docx_path = tmp_path / "lesson.docx"
+def test_docx_loader_preserves_exact_paragraph_locations():
+    buffer = BytesIO()
 
     word_document = WordDocument()
     word_document.add_paragraph(
@@ -147,10 +142,11 @@ def test_docx_loader_preserves_exact_paragraph_locations(
     word_document.add_paragraph(
         "Third paragraph"
     )
-    word_document.save(docx_path)
+    word_document.save(buffer)
 
     documents = DOCXLoader().load(
-        str(docx_path),
+        buffer.getvalue(),
+        filename="lesson.docx",
         document_id="doc-1",
         subject_id="subject-1",
     )
@@ -175,12 +171,10 @@ def test_docx_loader_preserves_exact_paragraph_locations(
     )
 
 
-def test_docx_loader_rejects_nonempty_tables(
-    tmp_path,
-):
-    docx_path = tmp_path / "with-table.docx"
-
+def test_docx_loader_rejects_nonempty_tables():
+    buffer = BytesIO()
     word_document = WordDocument()
+
     word_document.add_paragraph(
         "Body paragraph"
     )
@@ -192,61 +186,51 @@ def test_docx_loader_rejects_nonempty_tables(
     table.cell(0, 0).text = "Column A"
     table.cell(0, 1).text = "Column B"
 
-    word_document.save(docx_path)
+    word_document.save(buffer)
 
     with pytest.raises(
         ValueError,
         match="DOCX tables are not supported",
     ):
         DOCXLoader().load(
-            str(docx_path),
+            buffer.getvalue(),
+            filename="with-table.docx",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_docx_loader_rejects_empty_document(
-    tmp_path,
-):
-    docx_path = tmp_path / "empty.docx"
-
-    WordDocument().save(docx_path)
+def test_docx_loader_rejects_empty_document():
+    buffer = BytesIO()
+    WordDocument().save(buffer)
 
     with pytest.raises(
         ValueError,
         match="DOCX file is empty",
     ):
         DOCXLoader().load(
-            str(docx_path),
+            buffer.getvalue(),
+            filename="empty.docx",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_docx_loader_rejects_invalid_container(
-    tmp_path,
-):
-    docx_path = tmp_path / "invalid.docx"
-    docx_path.write_bytes(
-        b"not a valid DOCX package"
-    )
-
+def test_docx_loader_rejects_invalid_container():
     with pytest.raises(
         ValueError,
         match="DOCX file is not valid",
     ):
         DOCXLoader().load(
-            str(docx_path),
+            b"not a valid DOCX package",
+            filename="invalid.docx",
             document_id="doc-1",
             subject_id="subject-1",
         )
 
 
-def test_docx_loader_normalizes_internal_line_breaks(
-    tmp_path,
-):
-    docx_path = tmp_path / "line-breaks.docx"
-
+def test_docx_loader_normalizes_internal_line_breaks():
+    buffer = BytesIO()
     word_document = WordDocument()
 
     first_paragraph = (
@@ -262,10 +246,11 @@ def test_docx_loader_normalizes_internal_line_breaks(
     word_document.add_paragraph(
         "Second paragraph"
     )
-    word_document.save(docx_path)
+    word_document.save(buffer)
 
     documents = DOCXLoader().load(
-        str(docx_path),
+        buffer.getvalue(),
+        filename="line-breaks.docx",
         document_id="doc-1",
         subject_id="subject-1",
     )

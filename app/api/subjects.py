@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
-
+from app.api.upload import get_source_storage
 from app.core.database import SessionLocal
 from app.repos.subject_repository import SubjectRepository
 from app.schemas.subject import (
@@ -49,7 +49,9 @@ def get_subject_deletion_service():
         db.close()
 
 
-def get_subject_restore_service():
+def get_subject_restore_service(
+    source_storage=Depends(get_source_storage),
+):
     from app.repos.document_repository import (
         DocumentRepository,
     )
@@ -67,7 +69,8 @@ def get_subject_restore_service():
             subject_repo=SubjectRepository(db),
             document_repo=document_repo,
             pdf_service=PDFService(
-                document_repo
+                document_repo,
+                source_storage=source_storage,
             ),
         )
     finally:

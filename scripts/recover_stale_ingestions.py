@@ -1,3 +1,10 @@
+import os
+from pathlib import Path
+
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
+
 from argparse import (
     ArgumentParser,
     ArgumentTypeError,
@@ -12,6 +19,17 @@ from app.services.ingestion_recovery_service import (
     IngestionRecoveryService,
 )
 from app.services.pdf_service import PDFService
+
+
+def get_source_storage() -> LocalSourceStorage:
+    return LocalSourceStorage(
+        root=Path(
+            os.getenv(
+                "CLOUDMENTOR_UPLOAD_DIR",
+                "storage/uploads",
+            )
+        )
+    )
 
 
 def positive_minutes(value: str) -> int:
@@ -95,11 +113,14 @@ def main() -> int:
             )
             return 0
 
+        source_storage = get_source_storage()
+
         recovery_service = (
             IngestionRecoveryService(
                 document_repo=document_repo,
                 pdf_service=PDFService(
-                    document_repo
+                    document_repo,
+                    source_storage=source_storage,
                 ),
             )
         )

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
-
+from unittest.mock import Mock
 from app.api.subjects import (
     get_subject_repository,
     get_subject_deletion_service,
@@ -410,3 +410,67 @@ def test_restore_subject_returns_500_when_rebuild_fails():
     assert response.json() == {
         "detail": "Subject restoration failed"
     }
+
+
+def test_get_subject_restore_service_injects_source_storage(
+    monkeypatch,
+):
+    source_storage = Mock()
+    db = Mock()
+    subject_repo = Mock()
+    document_repo = Mock()
+    pdf_service = Mock()
+    restore_service = Mock()
+
+    monkeypatch.setattr(
+        "app.api.subjects.SessionLocal",
+        Mock(return_value=db),
+    )
+    monkeypatch.setattr(
+        "app.api.subjects.SubjectRepository",
+        Mock(return_value=subject_repo),
+    )
+
+    document_repository_class = Mock(
+        return_value=document_repo
+    )
+    pdf_service_class = Mock(
+        return_value=pdf_service
+    )
+    restore_service_class = Mock(
+        return_value=restore_service
+    )
+
+    monkeypatch.setattr(
+        "app.repos.document_repository."
+        "DocumentRepository",
+        document_repository_class,
+    )
+    monkeypatch.setattr(
+        "app.services.pdf_service.PDFService",
+        pdf_service_class,
+    )
+    monkeypatch.setattr(
+        "app.services.subject_restore_service."
+        "SubjectRestoreService",
+        restore_service_class,
+    )
+
+    dependency = get_subject_restore_service(
+        source_storage=source_storage
+    )
+
+    assert next(dependency) is restore_service
+
+    pdf_service_class.assert_called_once_with(
+        document_repo,
+        source_storage=source_storage,
+    )
+    restore_service_class.assert_called_once_with(
+        subject_repo=subject_repo,
+        document_repo=document_repo,
+        pdf_service=pdf_service,
+    )
+
+    dependency.close()
+    db.close.assert_called_once_with()

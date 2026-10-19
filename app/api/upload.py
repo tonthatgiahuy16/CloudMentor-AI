@@ -57,28 +57,6 @@ router = APIRouter(
 )
 
 
-def get_pdf_service():
-    from app.services.pdf_service import PDFService
-
-    db = SessionLocal()
-
-    try:
-        document_repo = DocumentRepository(db)
-        yield PDFService(document_repo)
-
-    finally:
-        db.close()
-
-
-def get_upload_subject_repository():
-    db = SessionLocal()
-
-    try:
-        yield SubjectRepository(db)
-    finally:
-        db.close()
-
-
 def get_upload_dir() -> Path:
     return Path(
         os.getenv(
@@ -92,6 +70,32 @@ def get_source_storage(
     upload_dir: Path = Depends(get_upload_dir),
 ) -> LocalSourceStorage:
     return LocalSourceStorage(root=upload_dir)
+
+
+def get_pdf_service(
+    source_storage=Depends(get_source_storage),
+):
+    from app.services.pdf_service import PDFService
+
+    db = SessionLocal()
+
+    try:
+        document_repo = DocumentRepository(db)
+        yield PDFService(
+            document_repo,
+            source_storage=source_storage,
+        )
+    finally:
+        db.close()
+
+
+def get_upload_subject_repository():
+    db = SessionLocal()
+
+    try:
+        yield SubjectRepository(db)
+    finally:
+        db.close()
 
 
 def validate_document_upload(
@@ -292,12 +296,11 @@ async def upload_document(
 
     try:
         total_chunks = pdf_service.upload(
-            stored_source.source_uri,
+            source_uri=stored_source.source_uri,
             subject_id=subject_id,
             chapter=chapter,
             document_id=document_id,
             original_filename=original_name,
-            source_uri=stored_source.source_uri,
             content_sha256=stored_source.content_sha256,
             file_size_bytes=stored_source.file_size_bytes,
         )

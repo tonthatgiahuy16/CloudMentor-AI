@@ -1,4 +1,4 @@
-from pathlib import Path
+from io import BytesIO
 from typing import List
 
 from pypdf import PdfReader
@@ -61,76 +61,91 @@ def read_docx_paragraphs(source) -> list[str]:
 
     return paragraphs
 
-
 class PDFLoader:
-    """Read a PDF into page-level documents with lineage metadata."""
+    """Read PDF bytes into page-level documents."""
 
-    def load(self, pdf_path: str, document_id: str, subject_id: str) -> List[Document]:
-        pdf_file = Path(pdf_path)
+    def load(
+        self,
+        source_data: bytes,
+        *,
+        filename: str,
+        document_id: str,
+        subject_id: str,
+    ) -> List[Document]:
+        if not filename.lower().endswith(".pdf"):
+            raise ValueError(
+                f"Expected a PDF file: {filename}"
+            )
 
-        if not pdf_file.exists():
-            raise FileNotFoundError(f"PDF not found: {pdf_path}")
-        if not pdf_file.is_file():
-            raise ValueError(f"PDF path is not a file: {pdf_path}")
-        if pdf_file.suffix.lower() != ".pdf":
-            raise ValueError(f"Expected a PDF file: {pdf_path}")
+        logger.info(
+            "Loading PDF: %s",
+            filename,
+        )
 
-        logger.info("Loading PDF: %s", pdf_file.name)
-        reader = PdfReader(pdf_file)
+        reader = PdfReader(
+            BytesIO(source_data)
+        )
+
         documents = [
             Document(
                 document_id=document_id,
                 subject_id=subject_id,
                 page=page_number,
-                source=pdf_file.name,
+                source=filename,
                 text=page.extract_text() or "",
             )
-            for page_number, page in enumerate(reader.pages, start=1)
+            for page_number, page in enumerate(
+                reader.pages,
+                start=1,
+            )
         ]
-        logger.info("Loaded %s pages from %s", len(documents), pdf_file.name)
+
+        logger.info(
+            "Loaded %s pages from %s",
+            len(documents),
+            filename,
+        )
+
         return documents
 
 
 class TextLoader:
-    """Read a UTF-8 TXT file with line-level lineage."""
+    """Read UTF-8 TXT bytes with line-level lineage."""
 
     def load(
         self,
-        txt_path: str,
+        source_data: bytes,
+        *,
+        filename: str,
         document_id: str,
         subject_id: str,
     ) -> List[Document]:
-        txt_file = Path(txt_path)
-
-        if not txt_file.exists():
-            raise FileNotFoundError(
-                f"TXT file not found: {txt_path}"
-            )
-        if not txt_file.is_file():
+        if not filename.lower().endswith(".txt"):
             raise ValueError(
-                f"TXT path is not a file: {txt_path}"
-            )
-        if txt_file.suffix.lower() != ".txt":
-            raise ValueError(
-                f"Expected a TXT file: {txt_path}"
+                f"Expected a TXT file: {filename}"
             )
 
-        logger.info("Loading TXT: %s", txt_file.name)
+        logger.info(
+            "Loading TXT: %s",
+            filename,
+        )
 
         try:
-            text = txt_file.read_text(encoding="utf-8")
+            text = source_data.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValueError(
-                f"TXT file is not valid UTF-8: {txt_path}"
+                "TXT file is not valid UTF-8: "
+                f"{filename}"
             ) from exc
 
         lines = text.splitlines()
 
         if not lines or not any(
-            line.strip() for line in lines
+            line.strip()
+            for line in lines
         ):
             raise ValueError(
-                f"TXT file is empty: {txt_path}"
+                f"TXT file is empty: {filename}"
             )
 
         normalized_text = "\n".join(lines)
@@ -138,7 +153,7 @@ class TextLoader:
         document = Document(
             document_id=document_id,
             subject_id=subject_id,
-            source=txt_file.name,
+            source=filename,
             text=normalized_text,
             line_range=(1, len(lines)),
         )
@@ -146,48 +161,41 @@ class TextLoader:
         logger.info(
             "Loaded %s lines from %s",
             len(lines),
-            txt_file.name,
+            filename,
         )
+
         return [document]
 
 
 class DOCXLoader:
-    """Read DOCX body paragraphs with exact lineage."""
+    """Read DOCX bytes with paragraph-level lineage."""
 
     def load(
         self,
-        docx_path: str,
+        source_data: bytes,
+        *,
+        filename: str,
         document_id: str,
         subject_id: str,
     ) -> List[Document]:
-        docx_file = Path(docx_path)
-
-        if not docx_file.exists():
-            raise FileNotFoundError(
-                f"DOCX file not found: {docx_path}"
-            )
-        if not docx_file.is_file():
+        if not filename.lower().endswith(".docx"):
             raise ValueError(
-                f"DOCX path is not a file: {docx_path}"
-            )
-        if docx_file.suffix.lower() != ".docx":
-            raise ValueError(
-                f"Expected a DOCX file: {docx_path}"
+                f"Expected a DOCX file: {filename}"
             )
 
         logger.info(
             "Loading DOCX: %s",
-            docx_file.name,
+            filename,
         )
 
         paragraphs = read_docx_paragraphs(
-            docx_file
+            BytesIO(source_data)
         )
 
         document = Document(
             document_id=document_id,
             subject_id=subject_id,
-            source=docx_file.name,
+            source=filename,
             text="\n".join(paragraphs),
             paragraph_range=(
                 1,
@@ -198,6 +206,7 @@ class DOCXLoader:
         logger.info(
             "Loaded %s paragraphs from %s",
             len(paragraphs),
-            docx_file.name,
+            filename,
         )
+
         return [document]

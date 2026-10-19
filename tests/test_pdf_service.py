@@ -27,6 +27,7 @@ def test_retry_failed_document_reuses_source_and_document_id(
         document_id="failed-document-id",
         subject_id="subject-id",
         filename="lesson.pdf",
+        file_type="pdf",
         status="FAILED",
         source_uri=source_path.as_posix(),
         content_sha256=sha256(pdf_data).hexdigest(),
@@ -94,9 +95,11 @@ def test_retry_failed_document_reuses_source_and_document_id(
         "failed-document-id"
     )
     service.extract.run.assert_called_once_with(
-        source_path.as_posix(),
-        "failed-document-id",
-        "subject-id",
+        source_data=pdf_data,
+        filename="lesson.pdf",
+        file_type="pdf",
+        document_id="failed-document-id",
+        subject_id="subject-id",
     )
     service.transform.run.assert_called_once_with(
         extracted
@@ -144,6 +147,7 @@ def test_retry_rejects_source_with_changed_content(
         root=tmp_path,
     )
     service.document_repo = Mock()
+    service.index = Mock()
 
     with pytest.raises(
         RuntimeError,
@@ -152,6 +156,7 @@ def test_retry_rejects_source_with_changed_content(
         service.retry_failed_document(document)
 
     service.document_repo.mark_processing.assert_not_called()
+    service.index.delete_by_document_id.assert_not_called()
 
 
 def test_processing_failure_records_failed_stage():
@@ -176,7 +181,9 @@ def test_processing_failure_records_failed_stage():
         match="Controlled transform failure",
     ):
         service._process_document(
-            file_path="retained.pdf",
+            source_data=b"%PDF-1.4\nretained",
+            filename="retained.pdf",
+            file_type="pdf",
             document_id="failed-document-id",
             subject_id="subject-id",
         )
@@ -211,6 +218,7 @@ def test_recover_stale_document_reuses_source_and_document_id(
     document = SimpleNamespace(
         document_id="stale-document-id",
         subject_id="subject-id",
+        file_type="pdf",
         filename="lesson.pdf",
         status=status,
         source_uri=source_path.as_posix(),
@@ -239,7 +247,9 @@ def test_recover_stale_document_reuses_source_and_document_id(
         "stale-document-id"
     )
     service._process_document.assert_called_once_with(
-        file_path=source_path.as_posix(),
+        source_data=pdf_data,
+        filename="lesson.pdf",
+        file_type="pdf",
         document_id="stale-document-id",
         subject_id="subject-id",
     )
@@ -279,6 +289,7 @@ def test_recover_stale_document_marks_missing_source_failed():
         document_id="legacy-document-id",
         subject_id="subject-id",
         status="UPLOADED",
+        file_type="pdf",
         source_uri=None,
         content_sha256=None,
         file_size_bytes=None,
@@ -409,25 +420,27 @@ def test_rebuild_retained_document_marks_invalid_source_failed():
     service.index.delete_by_document_id.assert_not_called()
 
 
-def test_upload_txt_records_file_type_and_processes(
-    tmp_path,
-):
+def test_upload_txt_reads_source_through_storage():
     text_data = b"first line\nsecond line"
-    source_path = tmp_path / "retained.txt"
-    source_path.write_bytes(text_data)
+    source_uri = "source://document-1"
+
+    source_storage = Mock()
+    source_storage.read_bytes.return_value = (
+        text_data
+    )
 
     service = PDFService.__new__(PDFService)
+    service.source_storage = source_storage
     service.document_repo = Mock()
     service._process_document = Mock(
         return_value=2
     )
 
     result = service.upload(
-        str(source_path),
+        source_uri=source_uri,
         subject_id="subject-1",
         document_id="document-1",
         original_filename="lesson.txt",
-        source_uri=source_path.as_posix(),
         content_sha256=sha256(
             text_data
         ).hexdigest(),
@@ -436,20 +449,25 @@ def test_upload_txt_records_file_type_and_processes(
 
     assert result == 2
 
+    source_storage.read_bytes.assert_called_once_with(
+        source_uri
+    )
     service.document_repo.create.assert_called_once_with(
         document_id="document-1",
         subject_id="subject-1",
         filename="lesson.txt",
         file_type="txt",
         chapter=None,
-        source_uri=source_path.as_posix(),
+        source_uri=source_uri,
         content_sha256=sha256(
             text_data
         ).hexdigest(),
         file_size_bytes=len(text_data),
     )
     service._process_document.assert_called_once_with(
-        file_path=str(source_path),
+        source_data=text_data,
+        filename="lesson.txt",
+        file_type="txt",
         document_id="document-1",
         subject_id="subject-1",
     )
@@ -479,7 +497,9 @@ def test_process_txt_preserves_exact_line_ranges(
     service.embedding.run.return_value = embeddings
 
     result = service._process_document(
-        file_path=str(source_path),
+        source_data=source_path.read_bytes(),
+        filename="lesson.txt",
+        file_type="txt",
         document_id="document-1",
         subject_id="subject-1",
     )
@@ -621,7 +641,9 @@ def test_process_docx_preserves_exact_paragraph_ranges(
     service.embedding.run.return_value = embeddings
 
     result = service._process_document(
-        file_path=str(source_path),
+        source_data=source_path.read_bytes(),
+        filename="lesson.docx",
+        file_type="docx",
         document_id="document-1",
         subject_id="subject-1",
     )
@@ -751,6 +773,7 @@ def test_rebuild_reads_retained_source_through_storage():
         document_id="document-1",
         subject_id="subject-1",
         filename="lesson.txt",
+        file_type="txt",
         status="INDEXED",
         source_uri="source://document-1",
         content_sha256=(
@@ -781,7 +804,9 @@ def test_rebuild_reads_retained_source_through_storage():
         "source://document-1"
     )
     service._process_document.assert_called_once_with(
-        file_path="source://document-1",
+        source_data=source_data,
+        filename="lesson.txt",
+        file_type="txt",
         document_id="document-1",
         subject_id="subject-1",
     )
