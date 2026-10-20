@@ -6,13 +6,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-10-20 |
-| Application baseline | `0d82db5aa93f24014cf1e93a5e32247fff0d776f` |
-| Current milestone | Phase 2 locked: MinIO recovery failure handling verified locally |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; new sources can use local filesystem or MinIO storage, all eight eligible pre-existing local sources were migrated with checksum, size, and MinIO read-back verification while their local copies were retained, and recovery now distinguishes missing or changed retained sources from temporary storage unavailability before derived vectors are deleted; independent backups, concurrent duplicate protection, automated drift repair, and retrieval evaluation remain |
-| CI evidence | GitHub Actions backend and frontend checks passed through PR #34; feature commit `0d82db5` is locally verified with 280 backend tests, source compilation, and a live local MinIO outage followed by successful restore retry |
+| Snapshot date | 2026-10-21 |
+| Application baseline | `f263589829661ef1e0a7304c5a4e3922573b9773` |
+| Current milestone | Phase 2 locked: recoverable MinIO-backed ingestion, concurrent duplicate protection, and controlled cross-store repair |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; new sources can use local filesystem or MinIO storage, all eight eligible pre-existing local sources were migrated with checksum, size, and MinIO read-back verification while their local copies were retained, concurrent active-content duplicates are rejected at the database boundary, and PostgreSQL-Chroma repair is dry-run-first and limited to orphan vectors plus `INDEXED` documents with no vectors; independent backups and retrieval evaluation remain |
+| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PR #37; feature commit `f263589` is locally verified with 296 backend tests, source compilation, and a no-op reconciliation dry run plus apply |
 
-The status was captured against feature commit `0d82db5aa93f24014cf1e93a5e32247fff0d776f` before this documentation update receives its own commit.
+The status was captured against feature commit `f263589829661ef1e0a7304c5a4e3922573b9773` before this documentation update receives its own commit.
 
 ## Current capability
 
@@ -40,7 +40,7 @@ Operational recovery paths also exist for stale ingestions and for legacy docume
 
 Canonical source writes and reads use one injected `SourceStorage` contract. `LocalSourceStorage` and `MinioSourceStorage` implement that contract, while a shared factory selects the adapter for upload, subject restore, and stale-ingestion recovery. Extraction receives source bytes plus filename and type rather than treating `source_uri` as a filesystem path. A separate dry-run-first operator workflow migrates eligible local sources to deterministic MinIO objects, verifies their metadata and read-back bytes, and conditionally updates PostgreSQL without deleting the retained local copies.
 
-A read-only PostgreSQL-Chroma reconciliation workflow compares the relational lifecycle registry with the derived vector index. It reports indexed documents missing from Chroma, chunks without document lineage, chunks for unknown documents, chunks for known but non-expected documents, and subject mismatches. Drift is reported with a nonzero exit code; automated repair is not yet implemented.
+A PostgreSQL-Chroma reconciliation workflow compares the relational lifecycle registry with the derived vector index. The default command is audit-only; `--repair` prints a dry-run plan, and `--repair --apply` explicitly deletes orphan chunks and rebuilds `INDEXED` documents that have no Chroma chunks. Planned, applied, and failed actions are logged, failures return a nonzero exit code, and independent actions continue after a failure. Chunks without lineage, chunks for known non-expected documents, and subject mismatches remain report-only.
 
 The core application lifecycle remains covered by `tests/test_document_lifecycle_e2e.py`, which exercises real FastAPI routes, repositories, lifecycle orchestration, format-aware source metadata, and an isolated temporary Chroma index. Deterministic test doubles replace external embedding and answer generation at that boundary, while focused contract, loader, chunker, repository, service, API, and CLI tests cover PDF/TXT/DOCX validation, citation lineage, duplicate handling, retry, deletion, rebuild, stale recovery, subject trash and restore, legacy-source repair, and reconciliation reporting.
 
@@ -60,7 +60,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Source-location contract | Implemented | `Document`, `Chunk`, Chroma metadata, chat schemas, and frontend rendering require exactly one of page, line range, or paragraph range |
 | Overlapping chunk generation | Implemented | Chunk boundaries, overlap, indices, and page/line/paragraph metadata are automatically covered |
 | PostgreSQL document lifecycle | Implemented | `UPLOADED`, `PROCESSING`, `INDEXED`, `FAILED`, and `DELETED` states plus processing attempts, heartbeat, and stage metadata |
-| Duplicate-safe ingestion and failed retry | Implemented for sequential requests | Active duplicates are rejected; failed ingestion retries reuse retained source and document identity; concurrent-request uniqueness is not yet enforced |
+| Duplicate-safe ingestion and failed retry | Implemented with database concurrency protection | A partial unique PostgreSQL index rejects concurrent active documents with the same subject and content SHA-256; a reservation is created before source storage writes, while failed retries reuse retained source and document identity |
 | Stale-ingestion recovery | Implemented operator workflow | Stale selection, processing heartbeat, dry-run/apply CLI, failure handling, and automated tests |
 | Subject metadata propagation | Implemented | Metadata flows through document, chunk, vector, retrieval, and chat layers |
 | Subject-scoped retrieval | Implemented | Retriever and chat orchestration tests plus live local verification |
@@ -69,7 +69,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Retained-source Chroma rebuild | Implemented through subject restore | Automated multi-format and failure-path rebuild tests plus live local-filesystem and MinIO cycles preserve source identity and lineage; the MinIO cycle rebuilt 14 TXT/DOCX/PDF chunks and preserved format-aware citations, and a live outage retry rebuilt the same document without duplicate vectors |
 | Guarded legacy-source repair | Implemented operator workflow | Dry-run-first CLI, checksum and size verification, conflict protection, idempotent rerun tests, and live recovery evidence |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
-| Cross-store reconciliation audit | Implemented operator workflow | Dry-run reporting classifies missing indexed documents, missing lineage, unknown documents, known non-expected documents, and subject mismatches; repair remains manual |
+| Controlled PostgreSQL-Chroma reconciliation repair | Implemented operator workflow | Default audit and `--repair` are dry runs; `--repair --apply` deletes orphan chunks and rebuilds active indexed documents with no chunks, logs each outcome, isolates per-action failure, and is safe to rerun; missing lineage, known non-expected documents, and subject mismatches remain report-only |
 | Retrieval and answer benchmark | Not implemented | No measured relevance, citation-correctness, or faithfulness baseline |
 | Production operations | Not implemented | A local MinIO adapter exists, but independent backups, authentication, authorization, monitoring, and deployment remain out of scope |
 
@@ -77,18 +77,26 @@ A live local recovery was verified on 2026-10-17 against the application state m
 
 ### Automated
 
-- The full backend suite passed locally against feature commit `0d82db5aa93f24014cf1e93a5e32247fff0d776f` with `280 passed` and one existing Starlette `TestClient` dependency deprecation warning.
+- The full backend suite passed locally against feature commit `f263589829661ef1e0a7304c5a4e3922573b9773` with `296 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The skipped tests require opt-in live MinIO or PostgreSQL integration configuration.
 - Frontend ESLint and the TypeScript/Vite production build passed locally with 180 modules transformed.
 - `tests/test_document_lifecycle_e2e.py` covers PDF, TXT, and DOCX subject creation, upload, `INDEXED` state, subject-scoped retrieval with format-aware source lineage, deletion, PostgreSQL lifecycle state, Chroma removal, repeated upload behavior, failed-document retry, and retained-source rebuild.
 - The lifecycle test uses SQLite in memory, an isolated temporary Chroma directory, real TXT reading and DOCX paragraph parsing, and deterministic substitutes for heavyweight PDF extraction, embedding, and answer generation.
-- Contract, loader, cleaner, chunker, repository, storage, service, API, and CLI tests cover source-location validation, UTF-8 TXT lines, DOCX paragraph boundaries and manual line breaks, the explicit DOCX table rejection policy, canonical source metadata, local and MinIO source-storage contracts, storage-factory selection, injected retained-source validation, controlled local-to-MinIO migration, sequential duplicate protection, retained-source retry, processing heartbeats, stale-ingestion recovery, subject trash and restore, guarded legacy-source repair, and PostgreSQL-Chroma reconciliation reporting.
+- Contract, loader, cleaner, chunker, repository, storage, service, API, and CLI tests cover source-location validation, UTF-8 TXT lines, DOCX paragraph boundaries and manual line breaks, the explicit DOCX table rejection policy, canonical source metadata, local and MinIO source-storage contracts, storage-factory selection, injected retained-source validation, controlled local-to-MinIO migration, concurrent duplicate protection, retained-source retry, processing heartbeats, stale-ingestion recovery, subject trash and restore, guarded legacy-source repair, and PostgreSQL-Chroma reconciliation audit and repair.
 - MinIO hardening tests classify missing-object errors separately from temporary S3, connection, and stream-read failures; responses are released after stream failures. Rebuild tests verify that missing sources and checksum mismatches fail before derived-vector deletion, while a temporary source outage leaves the document unchanged and allows a later restore retry.
 - Legacy-source repair tests cover dry run, explicit apply, source changes after planning, conflicting target files, conflicting PostgreSQL metadata, missing documents, and idempotent reruns.
 - Local-to-MinIO migration tests cover dry-run classification, explicit apply, stale PostgreSQL snapshots, local-source changes, failed object read-back, commit rollback, per-document failure isolation, Unicode output on limited Windows consoles, and idempotent reruns.
-- GitHub Actions backend and frontend checks passed through PR #34, including multi-format ingestion, the storage boundary, path-independent source access, the MinIO adapter, and controlled local-source migration. The current recovery-hardening feature commit has not yet run in pull-request CI.
-- CI does not run live PostgreSQL, Chroma, embedding, and Gemini together as one external integration workflow.
+- GitHub Actions passed backend and frontend checks through PR #37. It also runs a pinned container-backed MinIO recovery integration job and a PostgreSQL concurrent-ingestion integration job.
+- CI still does not run live PostgreSQL, Chroma, embedding, and Gemini together as one external integration workflow.
 
 ### Manual local end-to-end
+
+Verified on 2026-10-21 against `feat/controlled-reconciliation-repair` at `f263589829661ef1e0a7304c5a4e3922573b9773`:
+
+- `python -m scripts.reconcile_postgres_chroma --repair` returned `repair_mode=dry-run` and `Repair plan is empty.`; it made no change.
+- `python -m scripts.reconcile_postgres_chroma --repair --apply` returned `deleted_orphan_chunks=0`, `rebuilt_documents=0`, `rebuilt_chunks=0`, and `failed_actions=0` for that empty plan.
+- Mutation paths are covered by focused regression tests: orphan deletion, rebuild of an indexed document with no vectors, action-level failure isolation, logged failure output, nonzero failure exit status, and idempotent rerun after repair.
+
+Result: **passed for the no-drift local state**. This manual run did not create artificial drift; the apply mutation paths are verified by automated tests.
 
 Verified on 2026-10-20 against `feat/minio-recovery-hardening` at `0d82db5aa93f24014cf1e93a5e32247fff0d776f`:
 
@@ -167,7 +175,7 @@ Result: **passed**.
 | Subject and document metadata | PostgreSQL | No production backup or restore procedure yet |
 | Document and subject lifecycle state | PostgreSQL | Recovery workflows are operator-invoked rather than scheduled |
 | Accepted PDF, TXT, and DOCX sources | Configured `LocalSourceStorage` or `MinioSourceStorage` | Both adapters support path-independent reads for retry and rebuild; all eight eligible local sources were migrated and verified while their local copies were retained; ten legacy rows still lack complete source metadata, and the verified MinIO service has no independent backup yet |
-| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation detects drift but does not repair it automatically |
+| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation has bounded operator repair for orphan chunks and indexed documents with no chunks |
 | Generated answers | API response | Not treated as a durable application record |
 
 PostgreSQL is the system of record for identity, metadata, and lifecycle state. Chroma is a derived retrieval index. Chroma can be audited against PostgreSQL and rebuilt through subject restore when a valid retained source exists. The storage boundary removes filesystem assumptions from extraction and lifecycle recovery, while the current MinIO guarantee remains local because the service and its volume are not independently backed up or operated as production infrastructure.
@@ -177,10 +185,10 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - The controlled migration covered all eight eligible local sources, but ten legacy document rows still lack the complete retained-source metadata required for automatic migration.
 - The verified MinIO service and volume are local; independent source-file and PostgreSQL backup and restore procedures are not established.
 - Automated storage and service tests cover missing MinIO objects, changed bytes, temporary S3 failures, connection failures, and interrupted reads. A temporary outage and successful retry were also verified with live local MinIO; live missing-object and changed-object exercises remain unrecorded.
-- Live MinIO is manually verified and is not exercised by GitHub Actions.
-- Duplicate-safe behavior covers sequential requests and failed retries; concurrent-request uniqueness is not enforced at the database level.
+- MinIO recovery has container-backed CI coverage, but the deployed local MinIO service remains manually operated.
+- Concurrent duplicate protection is implemented at the PostgreSQL boundary; production throughput, timeout, and contention behavior is not yet benchmarked.
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
-- PostgreSQL-Chroma reconciliation detects and classifies drift but does not repair it automatically.
+- PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
 - Retrieval relevance, citation correctness, and answer faithfulness are not benchmarked.
@@ -191,11 +199,11 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Add container-backed MinIO integration coverage for missing-object and changed-object recovery paths, then exercise it in CI without claiming production operations.
-2. Add database-level protection for concurrent duplicate ingestion and schedule stale-ingestion recovery.
-3. Add guarded PostgreSQL-Chroma repair actions on top of the existing reconciliation audit.
-4. Create a small multi-format retrieval and answer-quality evaluation dataset with relevance, citation-correctness, and faithfulness checks.
-5. Before private beta, establish independent PostgreSQL and source-file backups, test restoration from those backups, then add authentication and authorization.
+1. Create a small multi-format retrieval and answer-quality evaluation dataset with relevance, citation-correctness, and faithfulness checks.
+2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
+3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
+4. Define retention, review, and repair policy for legacy rows with incomplete source metadata and report-only reconciliation drift.
+5. Add authentication, authorization, and rate limiting before private beta.
 
 ## Update policy
 
