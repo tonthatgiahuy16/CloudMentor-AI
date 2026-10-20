@@ -203,15 +203,15 @@ class PDFService:
 
     def upload(
         self,
-        source_uri: str,
+        *,
+        source_data: bytes,
         subject_id: str,
         chapter: int | None = None,
         document_id: str | None = None,
         original_filename: str | None = None,
         content_sha256: str | None = None,
         file_size_bytes: int | None = None,
-        ):
-
+    ):
         if document_id is None:
             document_id = str(uuid4())
 
@@ -220,9 +220,6 @@ class PDFService:
                 "Original filename is required"
             )
 
-        source_data = self.source_storage.read_bytes(
-            source_uri
-        )
         filename = original_filename
         file_type = (
             Path(filename)
@@ -237,10 +234,24 @@ class PDFService:
             filename=filename,
             file_type=file_type,
             chapter=chapter,
-            source_uri=source_uri,
+            source_uri=None,
             content_sha256=content_sha256,
             file_size_bytes=file_size_bytes,
         )
+
+        stored_source = self.source_storage.store(
+            document_id=document_id,
+            filename=filename,
+            data=source_data,
+        )
+
+        self.document_repo.attach_source_metadata(
+            document_id=document_id,
+            source_uri=stored_source.source_uri,
+            content_sha256=stored_source.content_sha256,
+            file_size_bytes=stored_source.file_size_bytes,
+        )
+
         return self._process_document(
             source_data=source_data,
             filename=filename,

@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db_models.document import Document
 from app.db_models.subject import Subject
@@ -21,6 +22,14 @@ class DocumentReconciliationRecord:
     subject_id: str
     document_status: str
     subject_status: str
+
+
+class ActiveDocumentConflictError(RuntimeError):
+    def __init__(self, document: Document):
+        super().__init__(
+            "An active document with the same content exists"
+        )
+        self.document = document
 
 
 class DocumentRepository:
@@ -59,17 +68,27 @@ class DocumentRepository:
             file_size_bytes,
         )
 
-        if any(
-            value is not None
-            for value in current_metadata
-        ):
-            if current_metadata == requested_metadata:
-                return document
+        if current_metadata == requested_metadata:
+            return document
 
+        if document.source_uri is not None:
             raise RuntimeError(
                 "Document source metadata conflict"
             )
 
+        if (
+            document.content_sha256 not in {
+                None,
+                content_sha256,
+            }
+            or document.file_size_bytes not in {
+                None,
+                file_size_bytes,
+            }
+        ):
+            raise RuntimeError(
+                "Document source metadata conflict"
+            )
 
         document.source_uri = source_uri
         document.content_sha256 = content_sha256
@@ -472,8 +491,29 @@ class DocumentRepository:
             file_size_bytes=file_size_bytes,
         )
 
-        self.db.add(document)
-        self.db.commit()
-        self.db.refresh(document)
+        try:
+            self.db.add(document)
+            self.db.commit()
+            self.db.refresh(document)
+
+        except IntegrityError as exc:
+            self.db.rollback()
+
+            if content_sha256 is None:
+                raise
+
+            existing_document = (
+                self.get_active_by_subject_and_sha256(
+                    subject_id=subject_id,
+                    content_sha256=content_sha256,
+                )
+            )
+
+            if existing_document is None:
+                raise
+
+            raise ActiveDocumentConflictError(
+                existing_document
+            ) from exc
 
         return document

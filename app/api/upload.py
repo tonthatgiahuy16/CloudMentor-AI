@@ -22,7 +22,10 @@ from app.storage.source_storage_factory import (
     create_source_storage,
 )
 from app.core.database import SessionLocal
-from app.repos.document_repository import DocumentRepository
+from app.repos.document_repository import (
+    ActiveDocumentConflictError,
+    DocumentRepository,
+)
 from app.repos.subject_repository import (
     SubjectRepository,
 )
@@ -209,7 +212,6 @@ async def upload_document(
     subject_id: str = Form(...),
     chapter: int | None = Form(None),
     pdf_service=Depends(get_pdf_service),
-    source_storage=Depends(get_source_storage),
     subject_repo=Depends(
         get_upload_subject_repository
     ),
@@ -289,22 +291,31 @@ async def upload_document(
 
     document_id = str(uuid4())
 
-    stored_source = source_storage.store(
-        document_id=document_id,
-        filename=original_name,
-        data=data,
-    )
 
     try:
         total_chunks = pdf_service.upload(
-            source_uri=stored_source.source_uri,
+            source_data=data,
             subject_id=subject_id,
             chapter=chapter,
             document_id=document_id,
             original_filename=original_name,
-            content_sha256=stored_source.content_sha256,
-            file_size_bytes=stored_source.file_size_bytes,
+            content_sha256=content_sha256,
+            file_size_bytes=len(data),
         )
+
+    except ActiveDocumentConflictError as exc:
+        existing_document = exc.document
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "DOCUMENT_ALREADY_EXISTS",
+                "document_id": (
+                    existing_document.document_id
+                ),
+                "status": existing_document.status,
+            },
+        ) from exc
 
     except Exception as exc:
         raise HTTPException(

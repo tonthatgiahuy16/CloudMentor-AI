@@ -91,8 +91,8 @@ class LifecyclePDFService:
 
     def upload(
         self,
-        source_uri,
         *,
+        source_data,
         subject_id,
         chapter,
         document_id,
@@ -100,11 +100,6 @@ class LifecyclePDFService:
         content_sha256,
         file_size_bytes,
     ):
-
-        source_data = self.source_storage.read_bytes(
-            source_uri
-        )
-
         file_type = (
             Path(original_filename)
             .suffix
@@ -118,10 +113,24 @@ class LifecyclePDFService:
             filename=original_filename,
             file_type=file_type,
             chapter=chapter,
-            source_uri=source_uri,
+            source_uri=None,
             content_sha256=content_sha256,
             file_size_bytes=file_size_bytes,
         )
+
+        stored_source = self.source_storage.store(
+            document_id=document_id,
+            filename=original_filename,
+            data=source_data,
+        )
+
+        self.document_repo.attach_source_metadata(
+            document_id=document_id,
+            source_uri=stored_source.source_uri,
+            content_sha256=stored_source.content_sha256,
+            file_size_bytes=stored_source.file_size_bytes,
+        )
+
         self.document_repo.mark_processing(document_id)
 
         if file_type == "txt":
