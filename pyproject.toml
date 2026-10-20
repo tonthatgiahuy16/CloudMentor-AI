@@ -36,4 +36,5 @@ python_files = [
   "test_source_storage_factory.py",
   "test_local_source_migration_service.py",
   "test_migrate_local_sources_to_minio_script.py",
+  "test_minio_recovery_integration.py",
 ]
