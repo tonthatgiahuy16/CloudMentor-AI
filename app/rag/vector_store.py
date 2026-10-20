@@ -137,6 +137,30 @@ class VectorStore:
 
         return records
 
+    def delete_by_chunk_ids(
+        self,
+        chunk_ids: list[str],
+    ) -> int:
+        unique_chunk_ids = list(
+            dict.fromkeys(chunk_ids)
+        )
+
+        if not unique_chunk_ids:
+            return 0
+
+        results = self.collection.get(
+            ids=unique_chunk_ids,
+        )
+        existing_chunk_ids = results.get("ids") or []
+
+        if not existing_chunk_ids:
+            return 0
+
+        self.collection.delete(
+            ids=existing_chunk_ids,
+        )
+        return len(existing_chunk_ids)
+
     def delete_by_document_id(self, document_id: str):
         results = self.collection.get(
             where={"document_id": document_id},

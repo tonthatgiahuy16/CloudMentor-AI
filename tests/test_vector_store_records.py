@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 from app.rag.vector_store import VectorStore
 from app.models.chunk import Chunk
@@ -127,3 +127,57 @@ def test_add_serializes_source_locations_without_null_metadata():
         [0.2],
         [0.3],
     ]
+
+
+def test_delete_by_chunk_ids_deletes_existing_ids_once():
+    vector_store = VectorStore.__new__(VectorStore)
+    vector_store.collection = Mock()
+
+    vector_store.collection.get.side_effect = [
+        {
+            "ids": [
+                "orphan-document:0",
+                "orphan-document:1",
+            ]
+        },
+        {"ids": []},
+    ]
+
+    first_count = vector_store.delete_by_chunk_ids(
+        [
+            "orphan-document:0",
+            "orphan-document:1",
+        ]
+    )
+    second_count = vector_store.delete_by_chunk_ids(
+        [
+            "orphan-document:0",
+            "orphan-document:1",
+        ]
+    )
+
+    assert first_count == 2
+    assert second_count == 0
+
+    vector_store.collection.get.assert_has_calls(
+        [
+            call(
+                ids=[
+                    "orphan-document:0",
+                    "orphan-document:1",
+                ]
+            ),
+            call(
+                ids=[
+                    "orphan-document:0",
+                    "orphan-document:1",
+                ]
+            ),
+        ]
+    )
+    vector_store.collection.delete.assert_called_once_with(
+        ids=[
+            "orphan-document:0",
+            "orphan-document:1",
+        ]
+    )

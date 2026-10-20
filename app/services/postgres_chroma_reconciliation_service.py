@@ -45,6 +45,41 @@ class ReconciliationReport:
         )
 
 
+@dataclass(frozen=True)
+class ReconciliationRepairPlan:
+    delete_orphan_chunk_ids: tuple[str, ...]
+    rebuild_document_ids: tuple[str, ...]
+
+    @property
+    def is_empty(self) -> bool:
+        return not (
+            self.delete_orphan_chunk_ids
+            or self.rebuild_document_ids
+        )
+
+
+@dataclass(frozen=True)
+class ReconciliationRepairFailure:
+    action: str
+    target_id: str
+    error_message: str
+
+
+@dataclass(frozen=True)
+class ReconciliationRepairResult:
+    deleted_orphan_chunk_ids: tuple[str, ...]
+    rebuilt_document_ids: tuple[str, ...]
+    rebuilt_chunk_count: int
+    failed_actions: tuple[
+        ReconciliationRepairFailure,
+        ...,
+    ] = ()
+
+    @property
+    def is_successful(self) -> bool:
+        return not self.failed_actions
+
+
 class PostgresChromaReconciliationService:
     def __init__(
         self,
@@ -224,4 +259,79 @@ class PostgresChromaReconciliationService:
                     ),
                 )
             ),
+        )
+
+    def plan_repair(self) -> ReconciliationRepairPlan:
+        report = self.audit()
+
+        return ReconciliationRepairPlan(
+            delete_orphan_chunk_ids=report.orphan_chunk_ids,
+            rebuild_document_ids=report.missing_document_ids,
+        )
+
+    def apply_repair(
+        self,
+        *,
+        document_rebuilder,
+    ) -> ReconciliationRepairResult:
+        plan = self.plan_repair()
+
+        deleted_orphan_chunk_ids = []
+        failed_actions = []
+
+        for chunk_id in plan.delete_orphan_chunk_ids:
+            try:
+                self.vector_store.delete_by_chunk_ids(
+                    [chunk_id]
+                )
+                deleted_orphan_chunk_ids.append(chunk_id)
+            except Exception as exc:
+                failed_actions.append(
+                    ReconciliationRepairFailure(
+                        action="delete_orphan_chunk",
+                        target_id=chunk_id,
+                        error_message=str(exc),
+                    )
+                )
+
+        current_documents = {
+            document.document_id: document
+            for document in (
+                self.document_repo
+                .list_indexed_for_active_subjects()
+            )
+        }
+
+        rebuilt_document_ids = []
+        rebuilt_chunk_count = 0
+
+        for document_id in plan.rebuild_document_ids:
+            document = current_documents.get(document_id)
+
+            if document is None:
+                continue
+
+            try:
+                rebuilt_chunk_count += document_rebuilder(
+                    document
+                )
+                rebuilt_document_ids.append(document_id)
+            except Exception as exc:
+                failed_actions.append(
+                    ReconciliationRepairFailure(
+                        action="rebuild_document",
+                        target_id=document_id,
+                        error_message=str(exc),
+                    )
+                )
+
+        return ReconciliationRepairResult(
+            deleted_orphan_chunk_ids=(
+                tuple(deleted_orphan_chunk_ids)
+            ),
+            rebuilt_document_ids=tuple(
+                rebuilt_document_ids
+            ),
+            rebuilt_chunk_count=rebuilt_chunk_count,
+            failed_actions=tuple(failed_actions),
         )
