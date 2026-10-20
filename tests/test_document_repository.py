@@ -1,15 +1,22 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from sqlalchemy.exc import IntegrityError
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.db_models.document import Document
 from app.core.database import Base
 from app.db_models.subject import Subject
-from app.repos.document_repository import DocumentRepository
+from app.repos.document_repository import (
+    ActiveDocumentConflictError,
+    DocumentRepository,
+)
 from unittest.mock import Mock
+
 
 @pytest.fixture
 def db_session():
@@ -1197,3 +1204,175 @@ def test_list_all_returns_documents_in_stable_order(
             second_document.document_id,
         ]
     )
+
+
+def test_database_rejects_duplicate_active_content_for_subject(
+    db_session,
+    repository,
+    document,
+):
+    content_sha256 = "a" * 64
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri="storage/uploads/first.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+
+    duplicate_document = Document(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="renamed-copy.txt",
+        file_type="txt",
+        chapter=None,
+        status="UPLOADED",
+        source_uri="storage/uploads/second.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+    db_session.add(duplicate_document)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+    db_session.rollback()
+
+    db_session.rollback()
+
+
+def test_create_translates_active_duplicate_to_domain_error(
+    db_session,
+    repository,
+    document,
+):
+    content_sha256 = "e" * 64
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri="storage/uploads/original.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+
+    with pytest.raises(
+        ActiveDocumentConflictError,
+    ) as captured_error:
+        repository.create(
+            document_id=str(uuid4()),
+            subject_id=document.subject_id,
+            filename="renamed-copy.txt",
+            file_type="txt",
+            chapter=None,
+            source_uri=None,
+            content_sha256=content_sha256,
+            file_size_bytes=10,
+        )
+
+    assert captured_error.value.document.document_id == (
+        document.document_id
+    )
+    assert captured_error.value.document.status == "UPLOADED"
+
+    db_session.rollback()
+
+
+def test_database_allows_same_content_after_document_deleted(
+    repository,
+    document,
+):
+    content_sha256 = "b" * 64
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri="storage/uploads/first.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+    repository.mark_deleted(document.document_id)
+
+    result = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="reuploaded.txt",
+        file_type="txt",
+        chapter=None,
+        source_uri="storage/uploads/reuploaded.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+
+    assert result.document_id != document.document_id
+
+
+def test_database_rejects_new_document_for_failed_content(
+    db_session,
+    repository,
+    document,
+):
+    content_sha256 = "c" * 64
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri="storage/uploads/failed.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+    document.status = "FAILED"
+    db_session.commit()
+
+    duplicate_document = Document(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="retry-copy.txt",
+        file_type="txt",
+        chapter=None,
+        status="UPLOADED",
+        source_uri="storage/uploads/retry-copy.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+    db_session.add(duplicate_document)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+    db_session.rollback()
+
+
+def test_attach_source_metadata_completes_matching_reservation(
+    db_session,
+    repository,
+):
+    subject = Subject(
+        subject_id=str(uuid4()),
+        name=f"Subject {uuid4()}",
+    )
+    db_session.add(subject)
+    db_session.commit()
+
+    content_sha256 = "d" * 64
+
+    reserved_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=subject.subject_id,
+        filename="lesson.txt",
+        file_type="txt",
+        chapter=None,
+        source_uri=None,
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+
+    result = repository.attach_source_metadata(
+        document_id=reserved_document.document_id,
+        source_uri="minio://cloudmentor-sources/documents/id/source.txt",
+        content_sha256=content_sha256,
+        file_size_bytes=10,
+    )
+
+    assert result.source_uri == (
+        "minio://cloudmentor-sources/documents/id/source.txt"
+    )
+    assert result.content_sha256 == content_sha256
+    assert result.file_size_bytes == 10

@@ -6,6 +6,8 @@ from sqlalchemy import (
     ForeignKey,
     CheckConstraint,
     Text,
+    Index,
+    text,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -161,4 +163,19 @@ class Document(Base):
             "file_size_bytes >= 0",
             name="chk_documents_file_size_bytes",
         ),
+
+        Index(
+                    "uq_documents_active_subject_content_sha256",
+                    "subject_id",
+                    "content_sha256",
+                    unique=True,
+                    postgresql_where=text(
+                        "status != 'DELETED' "
+                        "AND content_sha256 IS NOT NULL"
+                    ),
+                    sqlite_where=text(
+                        "status != 'DELETED' "
+                        "AND content_sha256 IS NOT NULL"
+                    ),
+                ),
     )

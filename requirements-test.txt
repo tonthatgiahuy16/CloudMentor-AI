@@ -9,3 +9,5 @@ python-docx>=1.1,<2.0
 python-dotenv>=1.0,<2.0
 chromadb>=1.0,<2.0
 minio>=7.2,<8.0
+alembic>=1.14,<2.0
+psycopg[binary]>=3.2,<4.0

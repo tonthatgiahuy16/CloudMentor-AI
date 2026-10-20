@@ -1,5 +1,4 @@
 from hashlib import sha256
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
@@ -14,13 +13,18 @@ from app.api.upload import (
     get_source_storage,
     router,
 )
+from app.repos.document_repository import (
+    ActiveDocumentConflictError,
+)
+from app.storage.source_storage import (
+    LocalSourceStorage,
+)
+
 from io import BytesIO
 
 from docx import Document as WordDocument
 
-from app.storage.source_storage import (
-    LocalSourceStorage,
-)
+
 
 class FakeSubjectRepository:
     def __init__(self, subject):
@@ -46,8 +50,8 @@ class FakePDFService:
 
     def upload(
         self,
-        source_uri,
         *,
+        source_data,
         subject_id,
         chapter,
         document_id,
@@ -57,12 +61,11 @@ class FakePDFService:
     ):
         self.calls.append(
             (
-                Path(source_uri),
+                source_data,
                 subject_id,
                 chapter,
                 document_id,
                 original_filename,
-                source_uri,
                 content_sha256,
                 file_size_bytes,
             )
@@ -81,6 +84,23 @@ class DuplicatePDFService(FakePDFService):
             document_id="existing-document-id",
             filename="existing.pdf",
             status="INDEXED",
+        )
+
+
+class ConcurrentDuplicatePDFService(FakePDFService):
+    def __init__(self):
+        super().__init__()
+        self.existing_document = SimpleNamespace(
+            document_id="winning-document-id",
+            filename="original.pdf",
+            status="PROCESSING",
+        )
+        self.upload_calls = []
+
+    def upload(self, **kwargs):
+        self.upload_calls.append(kwargs)
+        raise ActiveDocumentConflictError(
+            self.existing_document
         )
 
 
@@ -183,16 +203,10 @@ def make_client(
     return TestClient(app), service
 
 
-def test_upload_accepts_pdf_and_uses_safe_server_filename(
+def test_upload_accepts_pdf_and_passes_source_bytes(
     tmp_path,
 ):
-    storage = Mock(
-        wraps=LocalSourceStorage(root=tmp_path)
-    )
-    client, service = make_client(
-        tmp_path,
-        source_storage=storage,
-    )
+    client, service = make_client(tmp_path)
 
     pdf_data = b"%PDF-1.4\ncontent"
 
@@ -214,34 +228,22 @@ def test_upload_accepts_pdf_and_uses_safe_server_filename(
     )
 
     assert response.status_code == 201
-    storage.store.assert_called_once()
-
-    store_arguments = storage.store.call_args.kwargs
-
-    assert store_arguments["document_id"] == (
-        response.json()["document_id"]
-    )
-    assert store_arguments["filename"] == "lesson.pdf"
-    assert store_arguments["data"] == pdf_data
     payload = response.json()
     assert payload["filename"] == "lesson.pdf"
     assert payload["chunks"] == 7
     (
-        saved_path,
+        source_data,
         subject_id,
         chapter,
         document_id,
         original_filename,
-        source_uri,
         content_sha256,
         file_size_bytes,
     ) = service.calls[0]
     assert subject_id == "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
     assert chapter == 3
     assert original_filename == "lesson.pdf"
-    assert saved_path.name == f"{document_id}_lesson.pdf"
-    assert saved_path.read_bytes().startswith(b"%PDF-")
-    assert source_uri == saved_path.as_posix()
+    assert source_data == pdf_data
     assert content_sha256 == sha256(pdf_data).hexdigest()
     assert file_size_bytes == len(pdf_data)
 
@@ -271,7 +273,7 @@ def test_upload_rejects_wrong_extension(tmp_path):
     assert response.status_code == 415
 
 
-def test_upload_retains_valid_pdf_when_processing_fails(
+def test_upload_returns_500_when_processing_fails(
     tmp_path,
 ):
     service = FailingPDFService()
@@ -304,15 +306,8 @@ def test_upload_retains_valid_pdf_when_processing_fails(
     "detail": "Document processing failed"
     }
 
-    retained_files = list(
-        tmp_path.glob("*_lesson.pdf")
-    )
 
-    assert len(retained_files) == 1
-    assert retained_files[0].read_bytes() == pdf_data
-
-
-def test_upload_rejects_active_duplicate_before_writing_file(
+def test_upload_rejects_active_duplicate_before_processing(
     tmp_path,
 ):
     service = DuplicatePDFService()
@@ -349,6 +344,55 @@ def test_upload_rejects_active_duplicate_before_writing_file(
     }
     assert service.calls == []
     assert list(tmp_path.iterdir()) == []
+
+
+def test_upload_returns_409_when_database_reservation_conflicts(
+    tmp_path,
+):
+    service = ConcurrentDuplicatePDFService()
+    client, _ = make_client(
+        tmp_path,
+        service=service,
+    )
+
+    pdf_data = b"%PDF-1.4\nconcurrent duplicate"
+
+    response = client.post(
+        "/upload/",
+        files={
+            "file": (
+                "same-content.pdf",
+                pdf_data,
+                "application/pdf",
+            )
+        },
+        data={
+            "subject_id": (
+                "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+            ),
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "code": "DOCUMENT_ALREADY_EXISTS",
+            "document_id": "winning-document-id",
+            "status": "PROCESSING",
+        }
+    }
+    assert service.upload_calls == [{
+        "source_data": pdf_data,
+        "subject_id": (
+            "7d13e6d0-ef38-4bf2-a5cf-a593517087e4"
+        ),
+        "chapter": None,
+        "document_id": service.upload_calls[0]["document_id"],
+        "original_filename": "same-content.pdf",
+        "content_sha256": sha256(pdf_data).hexdigest(),
+        "file_size_bytes": len(pdf_data),
+    }]
+    assert not list(tmp_path.iterdir())
 
 
 def test_upload_retries_failed_document_without_new_source_file(
@@ -492,7 +536,7 @@ def test_upload_rejects_missing_subject_before_writing(
     assert not list(tmp_path.iterdir())
 
 
-def test_upload_accepts_txt_and_retains_source_bytes(
+def test_upload_accepts_txt_and_passes_source_bytes(
     tmp_path,
 ):
     client, service = make_client(tmp_path)
@@ -525,12 +569,11 @@ def test_upload_accepts_txt_and_retains_source_bytes(
     assert response.json()["chunks"] == 7
 
     (
-        saved_path,
+        source_data,
         subject_id,
         chapter,
         document_id,
         original_filename,
-        source_uri,
         content_sha256,
         file_size_bytes,
     ) = service.calls[0]
@@ -540,11 +583,7 @@ def test_upload_accepts_txt_and_retains_source_bytes(
     )
     assert chapter is None
     assert original_filename == "lesson.txt"
-    assert saved_path.name == (
-        f"{document_id}_lesson.txt"
-    )
-    assert saved_path.read_bytes() == text_data
-    assert source_uri == saved_path.as_posix()
+    assert source_data == text_data
     assert content_sha256 == (
         sha256(text_data).hexdigest()
     )
@@ -598,7 +637,7 @@ def test_upload_rejects_invalid_txt_before_writing(
     assert not list(tmp_path.iterdir())
 
 
-def test_upload_accepts_docx_and_retains_source_bytes(
+def test_upload_accepts_docx_and_passes_source_bytes(
     tmp_path,
 ):
     buffer = BytesIO()
@@ -643,22 +682,17 @@ def test_upload_accepts_docx_and_retains_source_bytes(
     assert response.json()["chunks"] == 7
 
     (
-        saved_path,
+        source_data,
         subject_id,
         chapter,
         document_id,
         original_filename,
-        source_uri,
         content_sha256,
         file_size_bytes,
     ) = service.calls[0]
 
     assert original_filename == "lesson.docx"
-    assert saved_path.name == (
-        f"{document_id}_lesson.docx"
-    )
-    assert saved_path.read_bytes() == docx_data
-    assert source_uri == saved_path.as_posix()
+    assert source_data == docx_data
     assert content_sha256 == (
         sha256(docx_data).hexdigest()
     )

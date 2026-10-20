@@ -16,6 +16,7 @@ from app.storage.source_storage import (
     LocalSourceStorage,
     SourceUnavailableError,
     SourceNotFoundError,
+    StoredSource,
 )
 
 from docx import Document as WordDocument
@@ -425,57 +426,113 @@ def test_rebuild_retained_document_marks_invalid_source_failed():
     service.index.delete_by_document_id.assert_not_called()
 
 
-def test_upload_txt_reads_source_through_storage():
+def test_upload_reserves_document_before_storing_source():
     text_data = b"first line\nsecond line"
-    source_uri = "source://document-1"
+    stored_source = StoredSource(
+        source_uri="source://document-1",
+        content_sha256=sha256(text_data).hexdigest(),
+        file_size_bytes=len(text_data),
+    )
 
     source_storage = Mock()
-    source_storage.read_bytes.return_value = (
-        text_data
-    )
+    call_order = []
+
+    def reserve_document(**_kwargs):
+        call_order.append("reserve")
+
+    def store_source(**_kwargs):
+        call_order.append("store")
+        return stored_source
+
+    def attach_metadata(**_kwargs):
+        call_order.append("attach")
+
+    def process_document(**_kwargs):
+        call_order.append("process")
+        return 2
 
     service = PDFService.__new__(PDFService)
     service.source_storage = source_storage
     service.document_repo = Mock()
+    service.document_repo.create.side_effect = (
+        reserve_document
+    )
+    service.document_repo.attach_source_metadata.side_effect = (
+        attach_metadata
+    )
+    service.source_storage.store.side_effect = store_source
     service._process_document = Mock(
-        return_value=2
+        side_effect=process_document
     )
 
     result = service.upload(
-        source_uri=source_uri,
+        source_data=text_data,
         subject_id="subject-1",
         document_id="document-1",
         original_filename="lesson.txt",
-        content_sha256=sha256(
-            text_data
-        ).hexdigest(),
+        content_sha256=sha256(text_data).hexdigest(),
         file_size_bytes=len(text_data),
     )
 
     assert result == 2
+    assert call_order == [
+        "reserve",
+        "store",
+        "attach",
+        "process",
+    ]
 
-    source_storage.read_bytes.assert_called_once_with(
-        source_uri
-    )
     service.document_repo.create.assert_called_once_with(
         document_id="document-1",
         subject_id="subject-1",
         filename="lesson.txt",
         file_type="txt",
         chapter=None,
-        source_uri=source_uri,
-        content_sha256=sha256(
-            text_data
-        ).hexdigest(),
+        source_uri=None,
+        content_sha256=sha256(text_data).hexdigest(),
         file_size_bytes=len(text_data),
     )
-    service._process_document.assert_called_once_with(
-        source_data=text_data,
-        filename="lesson.txt",
-        file_type="txt",
+    service.source_storage.store.assert_called_once_with(
         document_id="document-1",
-        subject_id="subject-1",
+        filename="lesson.txt",
+        data=text_data,
     )
+    service.document_repo.attach_source_metadata.assert_called_once_with(
+        document_id="document-1",
+        source_uri="source://document-1",
+        content_sha256=sha256(text_data).hexdigest(),
+        file_size_bytes=len(text_data),
+    )
+    source_storage.read_bytes.assert_not_called()
+
+
+def test_upload_does_not_store_source_when_reservation_fails():
+    text_data = b"first line\nsecond line"
+
+    service = PDFService.__new__(PDFService)
+    service.source_storage = Mock()
+    service.document_repo = Mock()
+    service.document_repo.create.side_effect = RuntimeError(
+        "document reservation conflict"
+    )
+    service._process_document = Mock()
+
+    with pytest.raises(
+        RuntimeError,
+        match="document reservation conflict",
+    ):
+        service.upload(
+            source_data=text_data,
+            subject_id="subject-1",
+            document_id="document-1",
+            original_filename="lesson.txt",
+            content_sha256=sha256(text_data).hexdigest(),
+            file_size_bytes=len(text_data),
+        )
+
+    service.source_storage.store.assert_not_called()
+    service.document_repo.attach_source_metadata.assert_not_called()
+    service._process_document.assert_not_called()
 
 
 def test_process_txt_preserves_exact_line_ranges(
