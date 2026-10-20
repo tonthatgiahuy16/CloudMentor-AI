@@ -34,4 +34,6 @@ python_files = [
   "test_recover_stale_ingestions_script.py",
   "test_minio_source_storage.py",
   "test_source_storage_factory.py",
+  "test_local_source_migration_service.py",
+  "test_migrate_local_sources_to_minio_script.py",
 ]

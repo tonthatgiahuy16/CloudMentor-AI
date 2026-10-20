@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base
 from app.db_models.subject import Subject
 from app.repos.document_repository import DocumentRepository
-
+from unittest.mock import Mock
 
 @pytest.fixture
 def db_session():
@@ -284,6 +284,181 @@ def test_attach_source_metadata_rejects_missing_document(
         )
 
     assert repository.get_by_id(missing_document_id) is None
+
+
+def test_replace_source_uri_if_matches_preserves_document_state(
+    repository,
+    document,
+):
+    local_uri = (
+        "storage/uploads/"
+        f"{document.document_id}_lesson.pdf"
+    )
+    content_sha256 = "a" * 64
+    file_size_bytes = 2048
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri=local_uri,
+        content_sha256=content_sha256,
+        file_size_bytes=file_size_bytes,
+    )
+
+    original_status = document.status
+    original_chapter = document.chapter
+
+    result = (
+        repository.replace_source_uri_if_matches(
+            document_id=document.document_id,
+            expected_source_uri=local_uri,
+            expected_content_sha256=content_sha256,
+            expected_file_size_bytes=file_size_bytes,
+            new_source_uri=(
+                "minio://cloudmentor/"
+                f"documents/{document.document_id}/"
+                "source.pdf"
+            ),
+        )
+    )
+
+    assert result.document_id == document.document_id
+    assert result.source_uri.startswith(
+        "minio://cloudmentor/"
+    )
+    assert result.content_sha256 == content_sha256
+    assert result.file_size_bytes == file_size_bytes
+    assert result.status == original_status
+    assert result.chapter == original_chapter
+
+
+@pytest.mark.parametrize(
+    (
+        "mismatched_argument",
+        "mismatched_value",
+    ),
+    [
+        (
+            "expected_source_uri",
+            "storage/uploads/other.pdf",
+        ),
+        (
+            "expected_content_sha256",
+            "b" * 64,
+        ),
+        (
+            "expected_file_size_bytes",
+            999,
+        ),
+    ],
+)
+def test_replace_source_uri_if_matches_rejects_stale_snapshot(
+    repository,
+    document,
+    mismatched_argument,
+    mismatched_value,
+):
+    local_uri = (
+        "storage/uploads/"
+        f"{document.document_id}_lesson.pdf"
+    )
+    content_sha256 = "a" * 64
+    file_size_bytes = 2048
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri=local_uri,
+        content_sha256=content_sha256,
+        file_size_bytes=file_size_bytes,
+    )
+
+    arguments = {
+        "document_id": document.document_id,
+        "expected_source_uri": local_uri,
+        "expected_content_sha256": content_sha256,
+        "expected_file_size_bytes": file_size_bytes,
+        "new_source_uri": (
+            "minio://cloudmentor/"
+            f"documents/{document.document_id}/"
+            "source.pdf"
+        ),
+    }
+    arguments[mismatched_argument] = (
+        mismatched_value
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Document source changed during migration",
+    ):
+        repository.replace_source_uri_if_matches(
+            **arguments
+        )
+
+    persisted = repository.get_by_id(
+        document.document_id
+    )
+
+    assert persisted is not None
+    assert persisted.source_uri == local_uri
+    assert persisted.content_sha256 == content_sha256
+    assert persisted.file_size_bytes == file_size_bytes
+
+
+def test_replace_source_uri_rolls_back_when_commit_fails(
+    db_session,
+    repository,
+    document,
+    monkeypatch,
+):
+    local_uri = (
+        "storage/uploads/"
+        f"{document.document_id}_lesson.pdf"
+    )
+    content_sha256 = "a" * 64
+    file_size_bytes = 2048
+
+    repository.attach_source_metadata(
+        document_id=document.document_id,
+        source_uri=local_uri,
+        content_sha256=content_sha256,
+        file_size_bytes=file_size_bytes,
+    )
+
+    rollback = Mock(
+        wraps=db_session.rollback
+    )
+    monkeypatch.setattr(
+        db_session,
+        "rollback",
+        rollback,
+    )
+    monkeypatch.setattr(
+        db_session,
+        "commit",
+        Mock(
+            side_effect=RuntimeError(
+                "controlled commit failure"
+            )
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="controlled commit failure",
+    ):
+        repository.replace_source_uri_if_matches(
+            document_id=document.document_id,
+            expected_source_uri=local_uri,
+            expected_content_sha256=content_sha256,
+            expected_file_size_bytes=file_size_bytes,
+            new_source_uri=(
+                "minio://cloudmentor/"
+                f"documents/{document.document_id}/"
+                "source.pdf"
+            ),
+        )
+
+    rollback.assert_called_once_with()
 
 
 def test_get_active_by_subject_and_sha256_returns_match(
@@ -995,3 +1170,30 @@ def test_list_reconciliation_records_includes_all_lifecycle_states(
             "DELETED",
         ),
     }
+
+
+def test_list_all_returns_documents_in_stable_order(
+    repository,
+    document,
+):
+    second_document = repository.create(
+        document_id=str(uuid4()),
+        subject_id=document.subject_id,
+        filename="second.txt",
+        file_type="txt",
+        chapter=None,
+    )
+
+    results = repository.list_all()
+
+    result_ids = [
+        item.document_id
+        for item in results
+    ]
+
+    assert result_ids == sorted(
+        [
+            document.document_id,
+            second_document.document_id,
+        ]
+    )

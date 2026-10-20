@@ -13,6 +13,26 @@ from app.storage.source_storage import (
 
 from minio.error import S3Error
 
+
+def test_minio_storage_builds_stable_source_uri_without_writing():
+    client = Mock()
+    storage = MinioSourceStorage(
+        client=client,
+        bucket_name="cloudmentor",
+    )
+
+    source_uri = storage.source_uri_for(
+        document_id="document-1",
+        filename="Lesson.TXT",
+    )
+
+    assert source_uri == (
+        "minio://cloudmentor/"
+        "documents/document-1/source.txt"
+    )
+    client.assert_not_called()
+
+
 def test_minio_storage_stores_source_and_metadata():
     source_data = b"canonical source content"
     client = Mock()

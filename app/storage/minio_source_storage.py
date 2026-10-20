@@ -20,6 +20,23 @@ class MinioSourceStorage:
         self.client = client
         self.bucket_name = bucket_name
 
+    def source_uri_for(
+        self,
+        *,
+        document_id: str,
+        filename: str,
+    ) -> str:
+        extension = Path(filename).suffix.lower()
+        object_key = (
+            f"documents/{document_id}/"
+            f"source{extension}"
+        )
+
+        return (
+            f"minio://{self.bucket_name}/"
+            f"{object_key}"
+        )
+
     def store(
         self,
         *,
@@ -27,16 +44,13 @@ class MinioSourceStorage:
         filename: str,
         data: bytes,
     ) -> StoredSource:
-        extension = Path(filename).suffix.lower()
-
-        object_key = (
-            f"documents/{document_id}/"
-            f"source{extension}"
+        source_uri = self.source_uri_for(
+            document_id=document_id,
+            filename=filename,
         )
-        source_uri = (
-            f"minio://{self.bucket_name}/"
-            f"{object_key}"
-        )
+        object_key = urlparse(
+            source_uri
+        ).path.lstrip("/")
 
         stored_source = StoredSource(
             source_uri=source_uri,
