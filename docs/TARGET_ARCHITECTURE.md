@@ -213,7 +213,7 @@ The project creates value by turning raw learning content and user activity into
 | Engineering challenge | Planned solution | How it will be validated |
 |---|---|---|
 | Large document binaries should not travel through Kafka | Store the source file separately; publish `document_id`, `source_uri`, metadata, and processing context | Event payload inspection and upload/load testing |
-| PostgreSQL lifecycle and Chroma index may become inconsistent | Treat PostgreSQL as the system of record; make Chroma a rebuildable derived index | Failure injection, reconciliation, delete, and rebuild tests |
+| PostgreSQL lifecycle and Chroma index may become inconsistent | Treat PostgreSQL as the system of record; make Chroma a rebuildable derived index; use dry-run-first, bounded reconciliation repair for safe drift classes | Failure injection, reconciliation audit/repair, delete, and rebuild tests |
 | Replayed events may create duplicate business effects | Use stable `event_id`, idempotent consumers, retry policy, and dead-letter handling | Replay the same event and verify one business outcome |
 | Metadata may be lost between pipeline stages | Define stage contracts and propagate `document_id`, `chunk_id`, subject, page, and source | Contract and lineage tests across the complete pipeline |
 | RAG answers may lack reliable evidence | Apply subject filters, retrieval thresholds, context-constrained prompting, and source serialization | Curated retrieval/answer evaluation set |
@@ -246,6 +246,7 @@ Problem -> Root cause -> Design decision -> Trade-off
 
 - **PostgreSQL is the system of record; Chroma is a derived serving index designed to be rebuildable once durable canonical content and an automated rebuild workflow exist.**
 - **Canonical source storage is selected behind one contract; application services consume source bytes rather than storage-specific paths or SDKs.**
+- **Cross-store repair is operator-controlled and dry-run-first: only orphan chunks and indexed documents with no chunks are eligible for explicit repair; ambiguous drift remains report-only.**
 - **Kafka transports events; it does not replace transactional storage.**
 - **Spark processes data; it does not serve application requests.**
 - **Gemini generates answers; retrieved context supplies the knowledge.**
@@ -261,7 +262,7 @@ Current setup and test instructions live in the repository [`README`](../README.
 | Phase | Status | Completion boundary |
 | --- | --- | --- |
 | Phase 1 — Core Data Foundation and RAG | Implemented baseline | Reproducible document upload → indexed state → scoped answer with source → delete; stable identity and stage contracts; automated coverage for the full local lifecycle. Manual verification is recorded separately. |
-| Phase 2 — Reliability and Multi-source Ingestion | Implemented local baseline | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, idempotency, cross-store reconciliation, tested delete/rebuild recovery, local-filesystem and MinIO adapters, dry-run-first migration of eligible retained local sources with read-back verification, and automated MinIO failure hardening plus a live local outage/retry exercise. Independent backups and production operations remain separate work. |
+| Phase 2 — Reliability and Multi-source Ingestion | Implemented local baseline | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, database-enforced concurrent-ingestion idempotency, cross-store reconciliation with bounded dry-run-first repair, tested delete/rebuild recovery, local-filesystem and MinIO adapters, dry-run-first migration of eligible retained local sources with read-back verification, and container-backed MinIO recovery tests plus a live local outage/retry exercise. Independent backups and production operations remain separate work. |
 | Phase 3 — Quiz and Learning Application | Planned | Users, quizzes, questions, attempts, answers, scores, and progress create complete, queryable learning records linked to their subject or topic. |
 | Phase 4 — Event-driven Processing with Kafka | Planned | A documented workload justifies asynchronous processing; versioned events can be replayed, consumers handle duplicates and failures, and upload latency or independent scaling is measured. |
 | Phase 5 — Distributed Analytics with Spark | Planned | Batch or streaming jobs produce validated curated datasets and versioned features with lineage; scale or latency benefit is measured against a simpler baseline. |

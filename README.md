@@ -29,7 +29,7 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The lifecycle is covered by automated application-level tests and recorded live local verification. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
+The lifecycle is covered by automated application-level tests and recorded live local verification. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. PostgreSQL-Chroma reconciliation is dry-run-first and can explicitly repair orphan vectors or rebuild an `INDEXED` document with no derived vectors. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
 
 ## What this project demonstrates
 
@@ -38,8 +38,8 @@ The lifecycle is covered by automated application-level tests and recorded live 
 - PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
 - Subject-scoped retrieval to keep queries inside the selected knowledge domain.
 - Context-constrained LLM answers with format-aware source references.
-- Duplicate-safe sequential ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
-- A read-only PostgreSQL-Chroma reconciliation audit and guarded legacy-source repair workflow.
+- Database-enforced duplicate protection for concurrent ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
+- A dry-run-first PostgreSQL-Chroma reconciliation workflow with bounded, logged repair for orphan vectors and indexed documents missing all vectors.
 - An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
 - A dry-run-first local-to-MinIO migration workflow with checksum, size, object read-back, conditional PostgreSQL update, and idempotent rerun protection.
 - Recovery hardening that distinguishes a missing or changed retained source from temporary MinIO unavailability, preserving document identity and avoiding derived-index deletion before source validation.
@@ -160,7 +160,7 @@ DELETED -> RESTORING -> ACTIVE
 - Document `DELETED`: the document is excluded from active use; there is no individual-document restore endpoint.
 - Subject `DELETED`: the subject is hidden from active use while its non-deleted document records and retained sources remain available for subject restore.
 
-Document deletion and subject trash remove derived records from active retrieval. Subject restore rebuilds retained documents, while the PostgreSQL-Chroma reconciliation workflow reports missing lineage, missing indexed documents, unknown documents, known non-expected documents, and subject mismatches. Reconciliation repair remains manual.
+Document deletion and subject trash remove derived records from active retrieval. Subject restore rebuilds retained documents. The PostgreSQL-Chroma reconciliation workflow reports missing lineage, missing indexed documents, unknown documents, known non-expected documents, and subject mismatches; its explicit repair mode can delete orphan vectors and rebuild `INDEXED` documents that have no vectors. Other drift classifications remain report-only.
 
 ## Traceability
 
@@ -293,6 +293,28 @@ python -m scripts.migrate_local_sources_to_minio --apply
 
 For each eligible document, apply revalidates the local bytes, writes the deterministic MinIO object, reads it back, verifies SHA-256 and size, and conditionally changes only `source_uri` in PostgreSQL. Local source files are intentionally retained. Rerun dry mode after apply to confirm that no eligible documents remain.
 
+### PostgreSQL-Chroma reconciliation repair
+
+Audit cross-store state without changing it:
+
+```powershell
+python -m scripts.reconcile_postgres_chroma
+```
+
+Print a repair plan before applying it:
+
+```powershell
+python -m scripts.reconcile_postgres_chroma --repair
+```
+
+Apply only the bounded repair actions explicitly:
+
+```powershell
+python -m scripts.reconcile_postgres_chroma --repair --apply
+```
+
+Repair deletes orphan Chroma chunks and rebuilds `INDEXED` documents that have no Chroma chunks from their retained source. Each planned, applied, or failed action is logged; failures return a nonzero exit code and do not stop independent repair actions. Chunks with missing lineage, known non-expected documents, and subject mismatches remain report-only for operator review.
+
 ### Frontend
 
 ```powershell
@@ -348,9 +370,8 @@ The script contains project-specific mappings. Review the mapping, back up the C
 - All eight eligible local sources in the recorded migration were moved to verified MinIO objects while their local copies were retained; ten legacy rows with incomplete source metadata remain outside automatic migration.
 - The verified MinIO instance is local and does not replace independent source-file and PostgreSQL backups.
 - Missing objects, changed bytes, temporary service failures, connection failures, and interrupted reads are covered by automated storage and recovery tests; only the temporary-outage retry has been exercised against a live local MinIO service.
-- Live MinIO remains manually verified rather than exercised by GitHub Actions.
-- PostgreSQL-Chroma reconciliation detects drift but does not repair it automatically.
-- Sequential duplicate ingestion and failed retries are guarded, but concurrent-request uniqueness is not enforced at the database level.
+- MinIO recovery is exercised by a pinned container-backed GitHub Actions job, but the deployed local MinIO service remains manually operated.
+- PostgreSQL-Chroma reconciliation repair is intentionally bounded: only orphan chunks and `INDEXED` documents with no chunks are eligible; missing lineage, known non-expected documents, and subject mismatches remain report-only.
 - Retrieval quality and answer faithfulness have not been benchmarked.
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
 - Authentication, authorization, rate limiting, observability, and production deployment are not implemented.
