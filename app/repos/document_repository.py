@@ -80,6 +80,59 @@ class DocumentRepository:
 
         return document
 
+    def replace_source_uri_if_matches(
+        self,
+        *,
+        document_id: str,
+        expected_source_uri: str,
+        expected_content_sha256: str,
+        expected_file_size_bytes: int,
+        new_source_uri: str,
+    ) -> Document:
+        try:
+            updated_rows = (
+                self.db.query(Document)
+                .filter(
+                    Document.document_id
+                    == document_id,
+                    Document.source_uri
+                    == expected_source_uri,
+                    Document.content_sha256
+                    == expected_content_sha256,
+                    Document.file_size_bytes
+                    == expected_file_size_bytes,
+                )
+                .update(
+                    {
+                        Document.source_uri: (
+                            new_source_uri
+                        ),
+                    },
+                    synchronize_session=False,
+                )
+            )
+
+            if updated_rows != 1:
+                raise RuntimeError(
+                    "Document source changed "
+                    "during migration"
+                )
+
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+        document = self.get_by_id(document_id)
+
+        if document is None:
+            raise RuntimeError("Document not found")
+
+        self.db.refresh(document)
+
+        return document
+
     def get_visible_by_id(
         self,
         document_id: str,
@@ -118,6 +171,16 @@ class DocumentRepository:
                 Document.uploaded_at.desc()
             )
             .first()
+        )
+
+
+    def list_all(self) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .order_by(
+                Document.document_id.asc()
+            )
+            .all()
         )
 
 
