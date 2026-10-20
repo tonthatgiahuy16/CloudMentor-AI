@@ -9,9 +9,12 @@ from app.storage.minio_source_storage import (
 from app.storage.source_storage import (
     SourceConflictError,
     SourceNotFoundError,
+    SourceUnavailableError,
+    SourceStorageError,
 )
 
 from minio.error import S3Error
+from urllib3.exceptions import MaxRetryError
 
 
 def test_minio_storage_builds_stable_source_uri_without_writing():
@@ -191,3 +194,98 @@ def test_minio_storage_translates_missing_object_error():
             "minio://cloudmentor/"
             "documents/document-1/source.txt"
         )
+
+
+def test_minio_storage_translates_temporary_service_error():
+    client = Mock()
+    client.get_object.side_effect = S3Error(
+        response=None,
+        code="ServiceUnavailable",
+        message="MinIO is temporarily unavailable",
+        resource=(
+            "/cloudmentor/documents/"
+            "document-1/source.txt"
+        ),
+        request_id="request-1",
+        host_id="host-1",
+    )
+
+    storage = MinioSourceStorage(
+        client=client,
+        bucket_name="cloudmentor",
+    )
+
+    with pytest.raises(
+        SourceUnavailableError,
+        match="temporarily unavailable",
+    ) as exc_info:
+        storage.read_bytes(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        )
+
+    assert not isinstance(
+        exc_info.value,
+        SourceNotFoundError,
+    )
+
+
+def test_minio_storage_translates_connection_failure():
+    client = Mock()
+    client.get_object.side_effect = MaxRetryError(
+        pool=Mock(),
+        url=(
+            "/cloudmentor/documents/"
+            "document-1/source.txt"
+        ),
+        reason=ConnectionRefusedError(
+            "Connection refused"
+        ),
+    )
+
+    storage = MinioSourceStorage(
+        client=client,
+        bucket_name="cloudmentor",
+    )
+
+    with pytest.raises(
+        SourceUnavailableError,
+        match="temporarily unavailable",
+    ):
+        storage.read_bytes(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        )
+
+
+def test_minio_storage_translates_stream_read_failure_and_releases_response():
+    client = Mock()
+    response = Mock()
+    response.read.side_effect = MaxRetryError(
+        pool=Mock(),
+        url=(
+            "/cloudmentor/documents/"
+            "document-1/source.txt"
+        ),
+        reason=ConnectionResetError(
+            "Connection reset"
+        ),
+    )
+    client.get_object.return_value = response
+
+    storage = MinioSourceStorage(
+        client=client,
+        bucket_name="cloudmentor",
+    )
+
+    with pytest.raises(
+        SourceUnavailableError,
+        match="temporarily unavailable",
+    ):
+        storage.read_bytes(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        )
+
+    response.close.assert_called_once_with()
+    response.release_conn.assert_called_once_with()

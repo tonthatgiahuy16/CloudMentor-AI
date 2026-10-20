@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.storage.source_storage import (
     LocalSourceStorage,
+    SourceNotFoundError,
     SourceStorage,
 )
 
@@ -178,6 +179,7 @@ class PDFService:
         except (
             FileNotFoundError,
             IsADirectoryError,
+            SourceNotFoundError,
         ) as exc:
             raise RetainedSourceValidationError(
                 "Retained source file is missing"

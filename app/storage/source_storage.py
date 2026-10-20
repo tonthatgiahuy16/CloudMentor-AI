@@ -36,6 +36,10 @@ class SourceNotFoundError(SourceStorageError):
     pass
 
 
+class SourceUnavailableError(SourceStorageError):
+    pass
+
+
 class SourceConflictError(SourceStorageError):
     pass
 
