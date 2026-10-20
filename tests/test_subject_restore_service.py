@@ -6,6 +6,9 @@ from app.services.subject_restore_service import (
     SubjectRestoreService,
 )
 
+from app.storage.source_storage import (
+    SourceUnavailableError,
+)
 
 def test_restore_rebuilds_documents_then_marks_subject_active():
     call_log = []
@@ -211,3 +214,81 @@ def test_restore_raises_when_subject_missing():
     subject_repo.mark_restore_failed.assert_not_called()
     document_repo.list_active_by_subject.assert_not_called()
     pdf_service.rebuild_retained_document.assert_not_called()
+
+
+def test_restore_retries_after_temporary_storage_failure():
+    deleted_subject = SimpleNamespace(
+        subject_id="subject-1",
+        status="DELETED",
+    )
+    restore_failed_subject = SimpleNamespace(
+        subject_id="subject-1",
+        status="RESTORE_FAILED",
+    )
+    active_subject = SimpleNamespace(
+        subject_id="subject-1",
+        status="ACTIVE",
+    )
+    document = SimpleNamespace(
+        document_id="document-1",
+    )
+
+    subject_repo = Mock()
+    subject_repo.get_by_id.side_effect = [
+        deleted_subject,
+        restore_failed_subject,
+    ]
+    subject_repo.mark_active.return_value = (
+        active_subject
+    )
+
+    document_repo = Mock()
+    document_repo.list_active_by_subject.return_value = [
+        document
+    ]
+
+    pdf_service = Mock()
+    pdf_service.rebuild_retained_document.side_effect = [
+        SourceUnavailableError(
+            "Source storage is temporarily unavailable"
+        ),
+        2,
+    ]
+
+    service = SubjectRestoreService(
+        subject_repo=subject_repo,
+        document_repo=document_repo,
+        pdf_service=pdf_service,
+    )
+
+    with pytest.raises(
+        SourceUnavailableError,
+        match="temporarily unavailable",
+    ):
+        service.restore("subject-1")
+
+    subject_repo.mark_restore_failed.assert_called_once_with(
+        subject_id="subject-1",
+        error_message=(
+            "Source storage is temporarily unavailable"
+        ),
+    )
+
+    result = service.restore("subject-1")
+
+    assert result == {
+        "subject_id": "subject-1",
+        "status": "ACTIVE",
+        "processed_documents": 1,
+        "indexed_chunks": 2,
+    }
+    assert (
+        pdf_service.rebuild_retained_document.call_args_list
+        == [
+            call(document),
+            call(document),
+        ]
+    )
+    subject_repo.mark_active.assert_called_once_with(
+        "subject-1"
+    )

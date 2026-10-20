@@ -4,13 +4,18 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call
 import pytest
 
-from app.services.pdf_service import PDFService
+from app.services.pdf_service import (
+    PDFService,
+    RetainedSourceValidationError,
+)
 from app.pipeline.chunk_pipeline import ChunkPipeline
 from app.pipeline.extract_pipeline import ExtractPipeline
 from app.pipeline.transform_pipeline import TransformPipeline
 from app.rag.chunker import TextChunker
 from app.storage.source_storage import (
     LocalSourceStorage,
+    SourceUnavailableError,
+    SourceNotFoundError,
 )
 
 from docx import Document as WordDocument
@@ -828,3 +833,150 @@ def test_pdf_service_accepts_injected_source_storage():
         ]
         is source_storage
     )
+
+
+def test_rebuild_marks_missing_storage_source_failed_before_deleting_index():
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        file_type="txt",
+        status="INDEXED",
+        source_uri=(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        ),
+        content_sha256=sha256(
+            b"expected source"
+        ).hexdigest(),
+        file_size_bytes=len(
+            b"expected source"
+        ),
+    )
+
+    source_storage = Mock()
+    source_storage.read_bytes.side_effect = (
+        SourceNotFoundError(
+            "Stored source does not exist"
+        )
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.source_storage = source_storage
+    service.document_repo = Mock()
+    service.index = Mock()
+
+    with pytest.raises(
+        RetainedSourceValidationError,
+        match="Retained source file is missing",
+    ):
+        service.rebuild_retained_document(
+            document
+        )
+
+    service.document_repo.mark_failed.assert_called_once_with(
+        document_id="document-1",
+        failed_stage="EXTRACT",
+        error_message=(
+            "Retained source file is missing"
+        ),
+    )
+    service.document_repo.mark_processing.assert_not_called()
+    service.index.delete_by_document_id.assert_not_called()
+
+
+def test_rebuild_preserves_document_and_index_when_storage_unavailable():
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        file_type="txt",
+        status="INDEXED",
+        source_uri=(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        ),
+        content_sha256=sha256(
+            b"expected source"
+        ).hexdigest(),
+        file_size_bytes=len(
+            b"expected source"
+        ),
+    )
+
+    source_storage = Mock()
+    source_storage.read_bytes.side_effect = (
+        SourceUnavailableError(
+            "Source storage is temporarily unavailable"
+        )
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.source_storage = source_storage
+    service.document_repo = Mock()
+    service.index = Mock()
+
+    with pytest.raises(
+        SourceUnavailableError,
+        match="temporarily unavailable",
+    ):
+        service.rebuild_retained_document(
+            document
+        )
+
+    service.document_repo.mark_failed.assert_not_called()
+    service.document_repo.mark_processing.assert_not_called()
+    service.index.delete_by_document_id.assert_not_called()
+
+
+def test_rebuild_rejects_checksum_mismatch_before_deleting_index():
+    expected_data = b"expected source"
+    changed_data = b"tampered source"
+
+    assert len(expected_data) == len(
+        changed_data
+    )
+
+    document = SimpleNamespace(
+        document_id="document-1",
+        subject_id="subject-1",
+        filename="lesson.txt",
+        file_type="txt",
+        status="INDEXED",
+        source_uri=(
+            "minio://cloudmentor/"
+            "documents/document-1/source.txt"
+        ),
+        content_sha256=sha256(
+            expected_data
+        ).hexdigest(),
+        file_size_bytes=len(expected_data),
+    )
+
+    source_storage = Mock()
+    source_storage.read_bytes.return_value = (
+        changed_data
+    )
+
+    service = PDFService.__new__(PDFService)
+    service.source_storage = source_storage
+    service.document_repo = Mock()
+    service.index = Mock()
+
+    with pytest.raises(
+        RetainedSourceValidationError,
+        match="checksum does not match",
+    ):
+        service.rebuild_retained_document(
+            document
+        )
+
+    service.document_repo.mark_failed.assert_called_once_with(
+        document_id="document-1",
+        failed_stage="EXTRACT",
+        error_message=(
+            "Retained source checksum does not match"
+        ),
+    )
+    service.document_repo.mark_processing.assert_not_called()
+    service.index.delete_by_document_id.assert_not_called()

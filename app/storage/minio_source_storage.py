@@ -5,10 +5,13 @@ from pathlib import Path
 from app.storage.source_storage import (
     SourceConflictError,
     SourceNotFoundError,
+    SourceUnavailableError,
     StoredSource,
 )
 from urllib.parse import urlparse
 from minio.error import S3Error
+from urllib3.exceptions import HTTPError
+
 
 class MinioSourceStorage:
     def __init__(
@@ -114,10 +117,20 @@ class MinioSourceStorage:
                     "Stored source does not exist"
                 ) from exc
 
-            raise
+            raise SourceUnavailableError(
+                "Source storage is temporarily unavailable"
+            ) from exc
+        except HTTPError as exc:
+            raise SourceUnavailableError(
+                "Source storage is temporarily unavailable"
+            ) from exc
 
         try:
             return response.read()
+        except HTTPError as exc:
+            raise SourceUnavailableError(
+                "Source storage is temporarily unavailable"
+            ) from exc
         finally:
             response.close()
             response.release_conn()
