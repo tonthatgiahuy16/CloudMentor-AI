@@ -29,7 +29,7 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The lifecycle is covered by automated application-level tests and recorded live local verification. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). MinIO is verified for new uploads and controlled migration of eligible local sources, but the project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
+The lifecycle is covered by automated application-level tests and recorded live local verification. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
 
 ## What this project demonstrates
 
@@ -42,6 +42,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 - A read-only PostgreSQL-Chroma reconciliation audit and guarded legacy-source repair workflow.
 - An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
 - A dry-run-first local-to-MinIO migration workflow with checksum, size, object read-back, conditional PostgreSQL update, and idempotent rerun protection.
+- Recovery hardening that distinguishes a missing or changed retained source from temporary MinIO unavailability, preserving document identity and avoiding derived-index deletion before source validation.
 - Clear boundaries between API, services, repositories, pipeline stages, retrieval, and generation.
 - Dependency injection that allows API and orchestration tests to run without live external services.
 - Automated backend and frontend checks in GitHub Actions.
@@ -135,7 +136,7 @@ Canonical sources are written and read through a shared storage interface implem
 
 PostgreSQL is the system of record for document identity, source metadata, and lifecycle state. Chroma is a derived retrieval index. Subject restore can rebuild Chroma from canonical bytes read through either storage adapter while preserving `document_id`, and the reconciliation audit can report drift between PostgreSQL and Chroma.
 
-The current MinIO recovery guarantee is verified locally rather than production-durable. Eligible existing local sources have been migrated with read-back checksum verification while their local copies remain retained. The next storage milestones are to exercise missing, changed, and temporarily unavailable objects and establish independent source-file and PostgreSQL backups.
+The current MinIO recovery guarantee is verified locally rather than production-durable. Eligible existing local sources have been migrated with read-back checksum verification while their local copies remain retained. Automated recovery tests cover missing objects, changed bytes, service failures, connection failures, and interrupted reads; a live local MinIO outage was followed by a successful restore retry under the same `document_id`. Independent source-file and PostgreSQL backups remain the next storage prerequisite for a production claim.
 
 ## Document lifecycle
 
@@ -346,8 +347,8 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 - All eight eligible local sources in the recorded migration were moved to verified MinIO objects while their local copies were retained; ten legacy rows with incomplete source metadata remain outside automatic migration.
 - The verified MinIO instance is local and does not replace independent source-file and PostgreSQL backups.
-- Missing objects are translated at the adapter boundary, but end-to-end recovery for missing or changed objects and temporary MinIO unavailability has not yet been exercised.
-- Live MinIO is verified manually rather than in GitHub Actions.
+- Missing objects, changed bytes, temporary service failures, connection failures, and interrupted reads are covered by automated storage and recovery tests; only the temporary-outage retry has been exercised against a live local MinIO service.
+- Live MinIO remains manually verified rather than exercised by GitHub Actions.
 - PostgreSQL-Chroma reconciliation detects drift but does not repair it automatically.
 - Sequential duplicate ingestion and failed retries are guarded, but concurrent-request uniqueness is not enforced at the database level.
 - Retrieval quality and answer faithfulness have not been benchmarked.
