@@ -4,7 +4,7 @@
 
 > A document-data platform for subject-scoped RAG, built around traceable ingestion, PostgreSQL lifecycle management, and a Chroma vector index designed to be rebuildable.
 
-CloudMentor AI is a final-year Data Science project that explores how learning documents can be converted into structured, traceable data for retrieval and LLM-based applications.
+CloudMentor AI is a data engineering-focused project that explores how learning documents can be converted into structured, traceable data for retrieval and LLM-based applications.
 
 Data Engineering is the backbone of the project. The main concerns are ingestion, metadata propagation, lifecycle state, data ownership, retrieval boundaries, validation, and recovery. RAG and the frontend consume the data produced by that backbone.
 
@@ -29,7 +29,7 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The lifecycle is covered by automated application-level tests and recorded live local verification. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. PostgreSQL-Chroma reconciliation is dry-run-first and can explicitly repair orphan vectors or rebuild an `INDEXED` document with no derived vectors. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
+The lifecycle is covered by automated application-level tests and recorded live local verification. Deterministic test doubles replace external embedding and answer generation in the application-level lifecycle test, and CI does not yet exercise live PostgreSQL, Chroma, embedding, and Gemini as one workflow. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. PostgreSQL-Chroma reconciliation is dry-run-first and can explicitly repair orphan vectors or rebuild an `INDEXED` document with no derived vectors. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
 
 ## What this project demonstrates
 
@@ -37,7 +37,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 - Page-, line-, paragraph-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
 - PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
 - Subject-scoped retrieval to keep queries inside the selected knowledge domain.
-- Context-constrained LLM answers with format-aware source references.
+- Context-based LLM answers with format-aware source references; retrieval relevance, citation correctness, and answer faithfulness are not yet benchmarked.
 - Database-enforced duplicate protection for concurrent ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
 - A dry-run-first PostgreSQL-Chroma reconciliation workflow with bounded, logged repair for orphan vectors and indexed documents missing all vectors.
 - An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
@@ -367,14 +367,18 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 ## Current limitations
 
-- All eight eligible local sources in the recorded migration were moved to verified MinIO objects while their local copies were retained; ten legacy rows with incomplete source metadata remain outside automatic migration.
+- In the 2026-10-21 status snapshot, all eight eligible local sources were moved to verified MinIO objects while their local copies were retained; ten legacy rows with incomplete source metadata remained outside automatic migration.
 - The verified MinIO instance is local and does not replace independent source-file and PostgreSQL backups.
 - Missing objects, changed bytes, temporary service failures, connection failures, and interrupted reads are covered by automated storage and recovery tests; only the temporary-outage retry has been exercised against a live local MinIO service.
 - MinIO recovery is exercised by a pinned container-backed GitHub Actions job, but the deployed local MinIO service remains manually operated.
+- Concurrent duplicate protection is enforced at the PostgreSQL boundary, but production throughput, timeout, and contention behavior have not been benchmarked.
+- Stale-ingestion recovery, legacy-source repair, and unresolved reconciliation drift still require operator action. Legacy documents without retained-source metadata require the correct original source file.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded: only orphan chunks and `INDEXED` documents with no chunks are eligible; missing lineage, known non-expected documents, and subject mismatches remain report-only.
-- Retrieval quality and answer faithfulness have not been benchmarked.
+- TXT ingestion is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
+- Retrieval relevance, citation correctness, and answer faithfulness have not been benchmarked.
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
-- Authentication, authorization, rate limiting, observability, and production deployment are not implemented.
+- Structured operational logging, metrics, tracing, and alerting are incomplete.
+- Authentication, authorization, rate limiting, and production deployment are not implemented.
 - Dedicated health and readiness checks are not implemented.
 
 ## Engineering principles
