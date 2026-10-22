@@ -394,7 +394,7 @@ The script contains project-specific mappings. Review the mapping, back up the C
 
 **Ton That Gia Huy**
 
-Final-year Data Science student focused on Data Engineering and applied AI systems.
+Data Engineering and Backend candidate focused on reliable data pipelines, lifecycle management, and applied AI systems.
 
 - GitHub: [tonthatgiahuy16](https://github.com/tonthatgiahuy16)
 - LinkedIn: [ton-that-gia-huy](https://www.linkedin.com/in/ton-that-gia-huy)
