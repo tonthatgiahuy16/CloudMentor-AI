@@ -1,0 +1,3 @@
+Validation checks the file name and media type.
+A valid document moves to later processing stages.
+This fixture does not state whether empty files are rejected.

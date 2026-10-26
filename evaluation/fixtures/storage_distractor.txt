@@ -1,0 +1,3 @@
+PostgreSQL stores document metadata and lifecycle state.
+Chroma provides similarity retrieval over derived chunks.
+The system does not define a backup schedule here.

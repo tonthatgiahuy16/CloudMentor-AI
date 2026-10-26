@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "sources": [
+    {
+      "source_id": "storage-basics-txt",
+      "subject_key": "storage-basics",
+      "path": "fixtures/storage_basics.txt",
+      "format": "txt"
+    },
+    {
+      "source_id": "ingestion-basics-docx",
+      "subject_key": "ingestion-basics",
+      "path": "fixtures/ingestion_basics.docx",
+      "format": "docx"
+    },
+    {
+  "source_id": "validation-basics-pdf",
+  "subject_key": "validation-basics",
+  "path": "fixtures/validation_basics.pdf",
+  "format": "pdf"
+},
+{
+  "source_id": "storage-distractor-txt",
+  "subject_key": "storage-basics",
+  "path": "fixtures/storage_distractor.txt",
+  "format": "txt"
+},
+{
+  "source_id": "ingestion-distractor-txt",
+  "subject_key": "ingestion-basics",
+  "path": "fixtures/ingestion_distractor.txt",
+  "format": "txt"
+},
+{
+  "source_id": "validation-distractor-txt",
+  "subject_key": "validation-basics",
+  "path": "fixtures/validation_distractor.txt",
+  "format": "txt"
+}
+  ],
+
+  "cases": [
+    {
+      "case_id": "txt-source-storage-001",
+      "subject_key": "storage-basics",
+      "question": "Where is the original source file retained?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "source_id": "storage-basics-txt",
+          "line_range": [2, 2]
+        }
+      ],
+      "expected_facts": [
+        "The original source file is retained in configured source storage."
+      ]
+    },
+    {
+        "case_id": "txt-backup-schedule-002",
+        "subject_key": "storage-basics",
+        "question": "What is the backup schedule for source files?",
+        "answerable": false,
+        "expected_evidence": [],
+        "expected_facts": []
+    },
+{
+  "case_id": "docx-transform-001",
+  "subject_key": "ingestion-basics",
+  "question": "What does the transform stage do before chunking?",
+  "answerable": true,
+  "expected_evidence": [
+    {
+      "source_id": "ingestion-basics-docx",
+      "paragraph_range": [2, 2]
+    }
+  ],
+  "expected_facts": [
+    "The transform stage cleans extracted text before chunking."
+  ]
+},
+{
+  "case_id": "pdf-validation-001",
+  "subject_key": "validation-basics",
+  "question": "What does validation reject before processing?",
+  "answerable": true,
+  "expected_evidence": [
+    {
+      "source_id": "validation-basics-pdf",
+      "page": 1
+    }
+  ],
+  "expected_facts": [
+    "Validation rejects empty files before processing."
+  ]
+}
+  ]
+}
