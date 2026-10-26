@@ -38,4 +38,7 @@ python_files = [
   "test_migrate_local_sources_to_minio_script.py",
   "test_minio_recovery_integration.py",
   "test_postgres_concurrent_ingestion_integration.py",
+  "test_rag_evaluation_dataset.py",
+  "test_rag_evaluation_scoring.py",
+  "test_rag_evaluation_runner.py",
 ]

@@ -1,0 +1,3 @@
+Extraction reads the source document before later stages.
+Chunking groups prepared content for retrieval.
+This fixture does not describe how text is cleaned.

@@ -28,3 +28,6 @@ chroma_db_before_subject_backfill/
 
 # Local SQLite test database
 /cloudmentor-test.db
+
+.pytest-tmp-*/
+evaluation/observations.local-*.json

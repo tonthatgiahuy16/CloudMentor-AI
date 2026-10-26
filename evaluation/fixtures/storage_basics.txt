@@ -1,0 +1,3 @@
+CloudMentor stores document metadata in PostgreSQL.
+The original source file is retained in configured source storage.
+Chroma stores a derived index used for retrieval.
