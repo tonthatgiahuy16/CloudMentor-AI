@@ -6,13 +6,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-10-21 |
-| Application baseline | `f263589829661ef1e0a7304c5a4e3922573b9773` |
-| Current milestone | Phase 2 locked: recoverable MinIO-backed ingestion, concurrent duplicate protection, and controlled cross-store repair |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; new sources can use local filesystem or MinIO storage, all eight eligible pre-existing local sources were migrated with checksum, size, and MinIO read-back verification while their local copies were retained, concurrent active-content duplicates are rejected at the database boundary, and PostgreSQL-Chroma repair is dry-run-first and limited to orphan vectors plus `INDEXED` documents with no vectors; independent backups and retrieval evaluation remain |
-| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PR #37; feature commit `f263589` is locally verified with 296 backend tests, source compilation, and a no-op reconciliation dry run plus apply |
+| Snapshot date | 2026-10-27 |
+| Application baseline | `3d969261ecb23c9ac7cdcfeb5917bf0d21447052` |
+| Current milestone | Phase 2 locked; retrieval-evaluation baseline added |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. A versioned retrieval-evaluation baseline now validates source fixtures and scores evidence coverage across TXT, DOCX, and PDF, including distractors; answer-level correctness and faithfulness remain unmeasured. |
+| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PR #39; feature commit `061224d` was locally verified with 313 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
 
-The status was captured against feature commit `f263589829661ef1e0a7304c5a4e3922573b9773` before this documentation update receives its own commit.
+The status was captured against `main` at merge commit `3d969261ecb23c9ac7cdcfeb5917bf0d21447052`, which includes retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1`, before this documentation update receives its own commit.
 
 ## Current capability
 
@@ -70,14 +70,15 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Guarded legacy-source repair | Implemented operator workflow | Dry-run-first CLI, checksum and size verification, conflict protection, idempotent rerun tests, and live recovery evidence |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Controlled PostgreSQL-Chroma reconciliation repair | Implemented operator workflow | Default audit and `--repair` are dry runs; `--repair --apply` deletes orphan chunks and rebuilds active indexed documents with no chunks, logs each outcome, isolates per-action failure, and is safe to rerun; missing lineage, known non-expected documents, and subject mismatches remain report-only |
-| Retrieval and answer benchmark | Not implemented | No measured relevance, citation-correctness, or faithfulness baseline |
+| Retrieval-evaluation baseline | Implemented locally | A versioned four-case TXT/DOCX/PDF dataset, three distractors, fixture/evidence validation, evidence-coverage scoring, a CLI, and automated tests. Manual subject-scoped retrieval returned expected evidence for 3/3 answerable cases; the unanswerable case still returned context. |
+| Answer-quality and faithfulness benchmark | Not implemented | Answer correctness, answer-level citation correctness, faithfulness, and refusal quality are not yet measured. |
 | Production operations | Not implemented | A local MinIO adapter exists, but independent backups, authentication, authorization, monitoring, and deployment remain out of scope |
 
 ## Verification evidence
 
 ### Automated
 
-- The full backend suite passed locally against feature commit `f263589829661ef1e0a7304c5a4e3922573b9773` with `296 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The skipped tests require opt-in live MinIO or PostgreSQL integration configuration.
+- The full backend suite passed locally against retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` with `313 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The local run used a project-local pytest temporary directory because the default Windows pytest temp root was inaccessible.
 - Frontend ESLint and the TypeScript/Vite production build passed locally with 180 modules transformed.
 - `tests/test_document_lifecycle_e2e.py` covers PDF, TXT, and DOCX subject creation, upload, `INDEXED` state, subject-scoped retrieval with format-aware source lineage, deletion, PostgreSQL lifecycle state, Chroma removal, repeated upload behavior, failed-document retry, and retained-source rebuild.
 - The lifecycle test uses SQLite in memory, an isolated temporary Chroma directory, real TXT reading and DOCX paragraph parsing, and deterministic substitutes for heavyweight PDF extraction, embedding, and answer generation.
@@ -89,6 +90,16 @@ A live local recovery was verified on 2026-10-17 against the application state m
 - CI still does not run live PostgreSQL, Chroma, embedding, and Gemini together as one external integration workflow.
 
 ### Manual local end-to-end
+
+Verified on 2026-10-26 on `feat/rag-evaluation-baseline`; the evaluated changes were subsequently committed as `061224df9259d4d96c7c2a14546789ee3b86b5c1`:
+
+- Created isolated evaluation subjects and uploaded one original fixture plus one distractor for each TXT, DOCX, and PDF source.
+- Queried the real embedding service and subject-scoped retriever without calling Gemini.
+- All 3 answerable cases returned evidence covering the expected source location.
+- The unanswerable backup-schedule case returned two contexts, including the storage distractor as the nearest result.
+- `python -m evaluation.run_retrieval_score` reported `answerable_case_count=3`, `retrieval_hits=3`, `retrieval_hit_rate=1.0`, `unanswerable_case_count=1`, and `unanswerable_cases_with_results=1`.
+
+Result: **passed for the narrow retrieval-evidence baseline**. This verification did not evaluate generated answers, citation correctness at answer level, faithfulness, or refusal behavior.
 
 Verified on 2026-10-21 against `feat/controlled-reconciliation-repair` at `f263589829661ef1e0a7304c5a4e3922573b9773`:
 
@@ -191,7 +202,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
-- Retrieval relevance, citation correctness, and answer faithfulness are not benchmarked.
+- A small retrieval-evidence baseline exists, but it contains only four cases. Broader retrieval relevance, answer-level citation correctness, faithfulness, and refusal quality are not yet benchmarked.
 - CI does not run live PostgreSQL, Chroma, embedding, and Gemini as one integration workflow.
 - Dedicated health and readiness endpoints are not implemented.
 - Structured operational logging, metrics, tracing, and alerting are incomplete.
@@ -199,7 +210,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Create a small multi-format retrieval and answer-quality evaluation dataset with relevance, citation-correctness, and faithfulness checks.
+1. Expand the multi-format retrieval dataset and add answer-quality evaluation for correctness, citation correctness, faithfulness, and appropriate refusal on unanswerable questions.
 2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
 3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
 4. Define retention, review, and repair policy for legacy rows with incomplete source metadata and report-only reconciliation drift.
