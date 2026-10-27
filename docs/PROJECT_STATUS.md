@@ -6,13 +6,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-10-27 |
-| Application baseline | `d964367574166c50921932c11127957081e260b5` |
-| Current milestone | F02 drift remediated locally with a prevention guard; F01 remains open |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery. Its report identified F01 (non-stable chunk IDs) and F02 (local Chroma drift); F02 was subsequently remediated locally and a pipeline failure cleanup guard was added. |
-| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PRs #39 and #41; feature commit `f67f448` was locally verified with 320 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
+| Snapshot date | 2026-10-28 |
+| Application baseline | `054f9396a71aa47ff29224cbbbf9e60a679eb19e` |
+| Current milestone | F01 deterministic chunk identity verified locally; F02 drift remediated locally; a future report-only drift operator policy remains |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery. Its F02 local Chroma drift was remediated with a cleanup guard, and its F01 chunk-identity finding was remediated with deterministic UUID v5 generation and a separate local Trash and Restore verification. |
+| CI evidence | PR #45 passed four GitHub Actions checks. The application baseline was locally verified with `325 passed, 3 skipped, 1 warning`; the warning is the existing Starlette `TestClient` dependency deprecation warning. |
 
-This status reflects the application baseline at `d964367574166c50921932c11127957081e260b5`. The Phase 2.5 local evidence run and its post-evidence F02 remediation are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
+This status reflects the application baseline at `054f9396a71aa47ff29224cbbbf9e60a679eb19e`. The Phase 2.5 local evidence run and its post-evidence F01 and F02 remediation records are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
 
 ## Current capability
 
@@ -209,7 +209,7 @@ Result: **passed**.
 | Subject and document metadata | PostgreSQL | No production backup or restore procedure yet |
 | Document and subject lifecycle state | PostgreSQL | Recovery workflows are operator-invoked rather than scheduled |
 | Accepted PDF, TXT, and DOCX sources | Configured `LocalSourceStorage` or `MinioSourceStorage` | Both adapters support path-independent reads for retry and rebuild; all eight eligible local sources were migrated and verified while their local copies were retained; ten legacy rows still lack complete source metadata, and the verified MinIO service has no independent backup yet |
-| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation has bounded operator repair for orphan chunks and indexed documents with no chunks, but current rebuilds regenerate chunk IDs |
+| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation has bounded operator repair for orphan chunks and indexed documents with no chunks; deterministic chunk IDs were verified locally across one isolated Trash and Restore exercise |
 | Generated answers | API response | Not treated as a durable application record |
 
 PostgreSQL is the system of record for identity, metadata, and lifecycle state. Chroma is a derived retrieval index. Chroma can be audited against PostgreSQL and rebuilt through subject restore when a valid retained source exists. The storage boundary removes filesystem assumptions from extraction and lifecycle recovery, while the current MinIO guarantee remains local because the service and its volume are not independently backed up or operated as production infrastructure.
@@ -222,7 +222,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - MinIO recovery has container-backed CI coverage, but the deployed local MinIO service remains manually operated.
 - Concurrent duplicate protection is implemented at the PostgreSQL boundary; production throughput, timeout, and contention behavior is not yet benchmarked.
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
-- Phase 2.5 evidence found that Chroma `chunk_id` values are regenerated during rebuild. Document identity and source lineage remain available, but stable chunk identity is not currently satisfied.
+- The original Phase 2.5 evidence run found regenerated Chroma `chunk_id` values during rebuild. Deterministic UUID v5 chunk IDs and a separate local Trash and Restore exercise now preserve chunk IDs, document IDs, and lineage for one TXT, DOCX, and PDF fixture each; a manual multi-chunk rebuild exercise remains unrecorded.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
 - The local F02 remediation snapshotted and removed 337 report-only derived chunks, after which the audit reported consistent stores. Future report-only drift still requires an explicit retention, review, and cleanup policy.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
@@ -235,12 +235,11 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Resolve the stable chunk-identity contract or explicitly revise it, then rerun the affected rebuild and recovery evidence.
-2. Define a retention, review, and manifest-driven cleanup policy for any future report-only reconciliation drift.
-3. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
-4. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
-5. Add authentication, authorization, and rate limiting before private beta.
-6. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
+1. Define a retention, review, and manifest-driven cleanup policy for any future report-only reconciliation drift.
+2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
+3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
+4. Add authentication, authorization, and rate limiting before private beta.
+5. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 
 ## Update policy
 

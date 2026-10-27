@@ -131,12 +131,12 @@
 - After Restore, all three original document IDs were visible again and Chroma contained three rebuilt chunks.
 - Restored chunk lineage preserved the source filename and format-specific source location: TXT lines 1-3, DOCX paragraphs 1-3, and PDF page 1.
 
-### Material finding F01 - Chunk IDs are not stable across rebuild
+### Historical finding F01 - Chunk IDs were not stable across rebuild
 
 - Before Trash, the evidence subject had three Chroma chunk IDs.
 - After Restore, the subject again had three chunks, but none of the previous chunk IDs was reused.
-- Repository inspection shows that the chunker generates `chunk_id` with a new UUID on each chunking run.
-- Therefore, document identity and source lineage are preserved, but stable chunk identity is not currently satisfied.
+- At the time of this run, the chunker generated a new UUID on each chunking run.
+- Therefore, document identity and source lineage were preserved, but stable chunk identity was not satisfied at the time of the original evidence run.
 
 ### Limitations
 
@@ -175,10 +175,11 @@
 
 ## Findings
 
-### F01 - Chunk IDs are not stable across rebuild
+### F01 - Deterministic chunk identity
 
-**Status:** Open
-The R05 Restore exercise preserved document identity and source lineage, but generated new Chroma chunk IDs. The current chunker uses a new UUID for every chunking run. This does not satisfy the stated stable `chunk_id` goal and makes persisted chunk-level references unstable across rebuild.
+**Status:** Remediated with local runtime evidence on 2026-10-28
+
+The original R05 Restore exercise generated new chunk IDs. PR #45 replaced random chunk IDs with versioned deterministic UUID v5 values derived from document identity, chunk position, source location, chunking configuration, and a SHA-256 hash of chunk text. Unit and pipeline coverage passed, followed by a separate isolated runtime Trash and Restore exercise that preserved all recorded chunk IDs, document IDs, and source lineage.
 
 ### F02 - Existing local Chroma drift
 
@@ -211,8 +212,8 @@ R06 found 83 chunks without `document_id` plus 254 chunks belonging to two known
 
 ### Limitations
 
-- The full audit still exits nonzero because F02 remains unresolved.
-- The rebuilt chunk received a new `chunk_id`, consistent with F01.
+- The full audit exited nonzero at the time because F02 remained unresolved.
+- At the time of this case, the rebuilt chunk received a new `chunk_id`, consistent with then-open F01.
 
 ## R08 - Stale ingestion recovery
 
@@ -251,11 +252,11 @@ All R01-R08 cases now have observed results.
 | --- | --- |
 | Evidence collection | Complete |
 | Valid ingestion, validation, duplicate protection, retry, lifecycle, controlled repair, and stale recovery | Demonstrated within the stated local scopes |
-| Local PostgreSQL-Chroma consistency | Failed during the evidence run because F02 was open |
-| Stable chunk identity | Failed because F01 remains open |
+| Local PostgreSQL-Chroma consistency | Failed during the original evidence run because F02 was open; remediated locally afterward |
+| Stable chunk identity | Failed during the original evidence run; remediated with later local runtime evidence |
 | Production readiness or private-beta authorization | Not established by this evidence run |
 
-At the end of the evidence run, the reliability objective was not approved as complete until F01 and F02 were resolved or their contracts were explicitly revised. F02 was remediated locally afterward; F01 remains open.
+At the end of the original evidence run, the reliability objective was not approved as complete until F01 and F02 were resolved or their contracts were explicitly revised. Both findings were remediated locally afterward; the remaining operational and private-beta boundaries are unchanged.
 
 ## Post-evidence F02 remediation
 
@@ -275,3 +276,27 @@ At the end of the evidence run, the reliability objective was not approved as co
 ### Remaining limitation
 
 - This was a local, operator-approved cleanup based on a local snapshot. The application still has no generic committed manifest workflow for future report-only drift; a future operator policy must decide retention, review, and explicit cleanup criteria.
+
+## Post-evidence F01 remediation
+
+**Status:** `remediated with local runtime evidence`
+
+**Application commit:** `054f9396a71aa47ff29224cbbbf9e60a679eb19e`
+
+**Scope:** One fresh isolated local subject with self-created TXT, DOCX, and PDF fixtures.
+
+| Check | Observed result |
+| --- | --- |
+| Evidence subject | `phase25-evidence-20261028-f01` (`3abf0ef4-3568-49bb-8ff8-72c3cc4801a4`) |
+| Implementation verification | Full backend suite: `325 passed, 3 skipped, 1 warning` |
+| Initial documents | Three `INDEXED` documents; one Chroma chunk per TXT, DOCX, and PDF fixture |
+| Baseline identity | Recorded all three `chunk_id` values, their `document_id` values, and format-aware source locations before Trash |
+| Trash | `HTTP 200`; subject reached `DELETED`; `processed_documents=3`; `deleted_chunks=3` |
+| Restore | `HTTP 200`; subject returned to `ACTIVE`; `processed_documents=3`; `indexed_chunks=3` |
+| Post-restore comparison | All three chunk IDs, document IDs, and source locations matched the pre-Trash baseline exactly |
+| Post-restore reconciliation | `Expected documents: 13`, `Chroma chunks: 469`, all drift categories zero, `Stores are consistent.`, exit code `0` in `2.426 s` |
+
+### Remaining limitation
+
+- Runtime evidence used one chunk per fixture. Deterministic multi-chunk behavior is covered by automated chunker and pipeline tests, but it has not yet been manually exercised with a large multi-chunk source.
+- This local result does not establish production readiness or authorize a private beta.
