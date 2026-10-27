@@ -1,8 +1,12 @@
+from hashlib import sha256
+import json
 from typing import List
 import uuid
 
 from app.models.chunk import Chunk
 from app.models.document import Document
+
+CHUNK_ID_SCHEMA_VERSION = "v1"
 
 
 class TextChunker:
@@ -16,6 +20,52 @@ class TextChunker:
 
         self.chunk_size = chunk_size
         self.overlap = overlap
+
+    def _build_chunk_id(
+        self,
+        *,
+        document: Document,
+        chunk_index: int,
+        chunk_text: str,
+        line_range: tuple[int, int] | None,
+        paragraph_range: tuple[int, int] | None,
+    ) -> str:
+        payload = {
+            "schema_version": CHUNK_ID_SCHEMA_VERSION,
+            "document_id": document.document_id,
+            "chunk_index": chunk_index,
+            "source": document.source,
+            "page": document.page,
+            "line_range": (
+                list(line_range)
+                if line_range is not None
+                else None
+            ),
+            "paragraph_range": (
+                list(paragraph_range)
+                if paragraph_range is not None
+                else None
+            ),
+            "chunk_size": self.chunk_size,
+            "overlap": self.overlap,
+            "text_sha256": sha256(
+                chunk_text.encode("utf-8")
+            ).hexdigest(),
+        }
+
+        canonical_payload = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+        return str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                canonical_payload,
+            )
+        )
 
     @staticmethod
     def _source_range_for_slice(
@@ -140,12 +190,22 @@ class TextChunker:
                         )
                     )
 
+                chunk_text = document.text[start:end]
+
                 chunks.append(
                     Chunk(
                         subject_id=(
                             document.subject_id
                         ),
-                        id=str(uuid.uuid4()),
+                        id=self._build_chunk_id(
+                            document=document,
+                            chunk_index=chunk_index,
+                            chunk_text=chunk_text,
+                            line_range=line_range,
+                            paragraph_range=(
+                                paragraph_range
+                            ),
+                        ),
                         document_id=(
                             document.document_id
                         ),
@@ -156,9 +216,7 @@ class TextChunker:
                             paragraph_range
                         ),
                         source=document.source,
-                        text=document.text[
-                            start:end
-                        ],
+                        text=chunk_text,
                     )
                 )
 
