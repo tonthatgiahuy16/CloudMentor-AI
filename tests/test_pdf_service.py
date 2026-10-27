@@ -711,6 +711,39 @@ def test_process_txt_preserves_exact_line_ranges(
     service.document_repo.mark_failed.assert_not_called()
 
 
+def test_process_txt_reuses_chunk_ids_for_same_document():
+    source_data = b"alpha\nbeta\ngamma\n"
+
+    service = PDFService.__new__(PDFService)
+    service.document_repo = Mock()
+    service.extract = ExtractPipeline()
+    service.transform = TransformPipeline()
+    service.chunk = ChunkPipeline()
+    service.chunk.chunker = TextChunker(
+        chunk_size=6,
+        overlap=0,
+    )
+    service.embedding = Mock()
+    service.index = Mock()
+    service.embedding.run.return_value = object()
+
+    for _ in range(2):
+        service._process_document(
+            source_data=source_data,
+            filename="lesson.txt",
+            file_type="txt",
+            document_id="document-1",
+            subject_id="subject-1",
+        )
+
+    first_chunks = service.index.run.call_args_list[0].args[0]
+    second_chunks = service.index.run.call_args_list[1].args[0]
+
+    assert [chunk.id for chunk in first_chunks] == [
+        chunk.id for chunk in second_chunks
+    ]
+
+
 def test_rebuild_retained_txt_reuses_identity_and_lineage(
     tmp_path,
 ):

@@ -19,6 +19,65 @@ def test_chunker_preserves_metadata_and_overlap():
     assert all(chunk.subject_id == "subject-1" for chunk in chunks)
 
 
+def test_chunk_ids_are_deterministic_for_same_input():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.txt",
+        text="abcdefghijklmno",
+        line_range=(1, 1),
+    )
+
+    chunker = TextChunker(
+        chunk_size=8,
+        overlap=3,
+    )
+
+    first_run = chunker.split([document])
+    second_run = chunker.split([document])
+
+    first_ids = [chunk.id for chunk in first_run]
+    second_ids = [chunk.id for chunk in second_run]
+
+    assert first_ids == second_ids
+    assert len(set(first_ids)) == len(first_ids)
+
+
+def test_chunk_id_changes_with_content_or_chunking_config():
+    original = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.txt",
+        text="abcdefgh",
+        line_range=(1, 1),
+    )
+    changed_content = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.txt",
+        text="abcdXfgh",
+        line_range=(1, 1),
+    )
+
+    original_chunk = TextChunker(
+        chunk_size=8,
+        overlap=0,
+    ).split([original])[0]
+
+    changed_content_chunk = TextChunker(
+        chunk_size=8,
+        overlap=0,
+    ).split([changed_content])[0]
+
+    changed_config_chunk = TextChunker(
+        chunk_size=10,
+        overlap=0,
+    ).split([original])[0]
+
+    assert original_chunk.id != changed_content_chunk.id
+    assert original_chunk.id != changed_config_chunk.id
+
+
 def test_chunk_indices_reset_for_each_document():
     chunker = TextChunker(chunk_size=5, overlap=0)
 
