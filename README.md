@@ -37,7 +37,7 @@ The lifecycle is covered by automated application-level tests and recorded live 
 - Page-, line-, paragraph-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
 - PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
 - Subject-scoped retrieval to keep queries inside the selected knowledge domain.
-- Context-based LLM answers with format-aware source references; retrieval relevance, citation correctness, and answer faithfulness are not yet benchmarked.
+- Context-based LLM answers with format-aware source references; a narrow four-case retrieval and answer-level evaluation baseline checks expected citation coverage automatically and records human-reviewed correctness, faithfulness, and refusal behavior. Broader retrieval relevance and answer quality remain unbenchmarked.
 - Database-enforced duplicate protection for concurrent ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
 - A dry-run-first PostgreSQL-Chroma reconciliation workflow with bounded, logged repair for orphan vectors and indexed documents missing all vectors.
 - An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
@@ -173,7 +173,7 @@ The ingestion path carries metadata needed to trace a retrieval result back to t
 - `chunk_index`
 - vector distance
 
-The chat API returns document and format-aware location references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. Retrieval quality, citation correctness, and answer faithfulness still require a benchmark and evaluation dataset.
+The chat API returns document and format-aware location references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. A narrow four-case retrieval and answer-level evaluation baseline now checks expected citation coverage automatically and records human-reviewed correctness, faithfulness, and refusal behavior; broader quality still requires a larger benchmark.
 
 ## API surface
 
@@ -375,7 +375,7 @@ The script contains project-specific mappings. Review the mapping, back up the C
 - Stale-ingestion recovery, legacy-source repair, and unresolved reconciliation drift still require operator action. Legacy documents without retained-source metadata require the correct original source file.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded: only orphan chunks and `INDEXED` documents with no chunks are eligible; missing lineage, known non-expected documents, and subject mismatches remain report-only.
 - TXT ingestion is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
-- Retrieval relevance, citation correctness, and answer faithfulness have not been benchmarked.
+- A narrow four-case retrieval and answer-level evaluation baseline exists across TXT, DOCX, and PDF. Citation coverage is checked automatically, while correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality remain unbenchmarked.
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
 - Structured operational logging, metrics, tracing, and alerting are incomplete.
 - Authentication, authorization, rate limiting, and production deployment are not implemented.
