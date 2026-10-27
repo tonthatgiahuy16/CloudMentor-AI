@@ -7,12 +7,12 @@ This document records the implementation status of CloudMentor AI at a specific 
 | Field | Value |
 | --- | --- |
 | Snapshot date | 2026-10-27 |
-| Application baseline | `3d969261ecb23c9ac7cdcfeb5917bf0d21447052` |
-| Current milestone | Phase 2 locked; retrieval-evaluation baseline added |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. A versioned retrieval-evaluation baseline now validates source fixtures and scores evidence coverage across TXT, DOCX, and PDF, including distractors; answer-level correctness and faithfulness remain unmeasured. |
-| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PR #39; feature commit `061224d` was locally verified with 313 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
+| Application baseline | `1e1d8ba3bbffef9a9236f8b7a2f5fe970f0653e3` |
+| Current milestone | Phase 2 locked; retrieval and answer-level evaluation baselines added |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. |
+| CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PRs #39 and #41; feature commit `f67f448` was locally verified with 320 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
 
-The status was captured against `main` at merge commit `3d969261ecb23c9ac7cdcfeb5917bf0d21447052`, which includes retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1`, before this documentation update receives its own commit.
+The status was captured against `main` at merge commit `1e1d8ba3bbffef9a9236f8b7a2f5fe970f0653e3`, which includes retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` and answer-evaluation feature commit `f67f448`, before this documentation update receives its own commit.
 
 ## Current capability
 
@@ -71,7 +71,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Controlled PostgreSQL-Chroma reconciliation repair | Implemented operator workflow | Default audit and `--repair` are dry runs; `--repair --apply` deletes orphan chunks and rebuilds active indexed documents with no chunks, logs each outcome, isolates per-action failure, and is safe to rerun; missing lineage, known non-expected documents, and subject mismatches remain report-only |
 | Retrieval-evaluation baseline | Implemented locally | A versioned four-case TXT/DOCX/PDF dataset, three distractors, fixture/evidence validation, evidence-coverage scoring, a CLI, and automated tests. Manual subject-scoped retrieval returned expected evidence for 3/3 answerable cases; the unanswerable case still returned context. |
-| Answer-quality and faithfulness benchmark | Not implemented | Answer correctness, answer-level citation correctness, faithfulness, and refusal quality are not yet measured. |
+| Answer-quality and faithfulness baseline | Implemented locally | Human-reviewed answer correctness, faithfulness, and refusal labels are combined with automated citation-coverage scoring from source lineage. A CLI aggregates the results; the narrow live baseline scored 3/3 answerable cases and 1/1 appropriate refusal. |
 | Production operations | Not implemented | A local MinIO adapter exists, but independent backups, authentication, authorization, monitoring, and deployment remain out of scope |
 
 ## Verification evidence
@@ -79,6 +79,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 ### Automated
 
 - The full backend suite passed locally against retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` with `313 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The local run used a project-local pytest temporary directory because the default Windows pytest temp root was inaccessible.
+- The full backend suite passed locally against answer-evaluation feature commit `f67f448` with `320 passed, 3 skipped` and the same existing warning. This run also used a project-local pytest temporary directory.
 - Frontend ESLint and the TypeScript/Vite production build passed locally with 180 modules transformed.
 - `tests/test_document_lifecycle_e2e.py` covers PDF, TXT, and DOCX subject creation, upload, `INDEXED` state, subject-scoped retrieval with format-aware source lineage, deletion, PostgreSQL lifecycle state, Chroma removal, repeated upload behavior, failed-document retry, and retained-source rebuild.
 - The lifecycle test uses SQLite in memory, an isolated temporary Chroma directory, real TXT reading and DOCX paragraph parsing, and deterministic substitutes for heavyweight PDF extraction, embedding, and answer generation.
@@ -100,6 +101,16 @@ Verified on 2026-10-26 on `feat/rag-evaluation-baseline`; the evaluated changes 
 - `python -m evaluation.run_retrieval_score` reported `answerable_case_count=3`, `retrieval_hits=3`, `retrieval_hit_rate=1.0`, `unanswerable_case_count=1`, and `unanswerable_cases_with_results=1`.
 
 Result: **passed for the narrow retrieval-evidence baseline**. This verification did not evaluate generated answers, citation correctness at answer level, faithfulness, or refusal behavior.
+
+Verified on 2026-10-27 on `feat/rag-answer-evaluation`; the evaluated changes were subsequently committed as `f67f448`:
+
+- Used the isolated TXT, DOCX, and PDF evaluation subjects and their original fixtures plus distractors.
+- Called the real `/chat/` endpoint and Gemini answer generator for all four cases, preserving the returned source locations in local observations.
+- Human review marked all 3 answerable responses correct and faithful; automated lineage scoring found expected citation coverage for all 3.
+- The unanswerable backup-schedule case retrieved two contexts but responded with an appropriate refusal; human review marked `refusal_correct=true`.
+- `python -m evaluation.run_answer_score` reported `answerable_case_count=3`, `answer_correct_count=3`, `citation_hit_count=3`, `faithful_count=3`, `unanswerable_case_count=1`, and `refusal_correct_count=1`, with each rate equal to `1.0` on this narrow dataset.
+
+Result: **passed for the narrow answer-level baseline**. Correctness, faithfulness, and refusal are human-reviewed labels; this result does not establish broad model quality or production readiness.
 
 Verified on 2026-10-21 against `feat/controlled-reconciliation-repair` at `f263589829661ef1e0a7304c5a4e3922573b9773`:
 
@@ -202,7 +213,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
-- A small retrieval-evidence baseline exists, but it contains only four cases. Broader retrieval relevance, answer-level citation correctness, faithfulness, and refusal quality are not yet benchmarked.
+- A small retrieval and answer-level evaluation baseline exists, but it contains only four cases. Answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality are not yet benchmarked.
 - CI does not run live PostgreSQL, Chroma, embedding, and Gemini as one integration workflow.
 - Dedicated health and readiness endpoints are not implemented.
 - Structured operational logging, metrics, tracing, and alerting are incomplete.
@@ -210,7 +221,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Expand the multi-format retrieval dataset and add answer-quality evaluation for correctness, citation correctness, faithfulness, and appropriate refusal on unanswerable questions.
+1. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
 3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
 4. Define retention, review, and repair policy for legacy rows with incomplete source metadata and report-only reconciliation drift.
