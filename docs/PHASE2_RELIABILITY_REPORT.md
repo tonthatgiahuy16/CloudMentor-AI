@@ -275,7 +275,7 @@ At the end of the original evidence run, the reliability objective was not appro
 
 ### Remaining limitation
 
-- This was a local, operator-approved cleanup based on a local snapshot. The application still has no generic committed manifest workflow for future report-only drift; a future operator policy must decide retention, review, and explicit cleanup criteria.
+- This was a local, operator-approved cleanup based on a local snapshot. Future report-only drift must follow the documented snapshot, classification, review, exact-ID manifest, apply, and verification procedure in [`RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md`](./RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md). The application still has no generic automatic cleanup for these categories.
 
 ## Post-evidence F01 remediation
 

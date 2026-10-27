@@ -8,11 +8,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 | --- | --- |
 | Snapshot date | 2026-10-28 |
 | Application baseline | `054f9396a71aa47ff29224cbbbf9e60a679eb19e` |
-| Current milestone | F01 deterministic chunk identity verified locally; F02 drift remediated locally; a future report-only drift operator policy remains |
+| Current milestone | F01 deterministic chunk identity verified locally; F02 drift remediated locally; the report-only drift operator policy is documented |
 | Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery. Its F02 local Chroma drift was remediated with a cleanup guard, and its F01 chunk-identity finding was remediated with deterministic UUID v5 generation and a separate local Trash and Restore verification. |
 | CI evidence | PR #45 passed four GitHub Actions checks. The application baseline was locally verified with `325 passed, 3 skipped, 1 warning`; the warning is the existing Starlette `TestClient` dependency deprecation warning. |
 
 This status reflects the application baseline at `054f9396a71aa47ff29224cbbbf9e60a679eb19e`. The Phase 2.5 local evidence run and its post-evidence F01 and F02 remediation records are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
+
+Report-only reconciliation drift is governed by [`RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md`](./RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md). The policy requires an operator-reviewed snapshot and exact-ID manifest; it does not add automatic cleanup.
 
 ## Current capability
 
@@ -224,7 +226,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
 - The original Phase 2.5 evidence run found regenerated Chroma `chunk_id` values during rebuild. Deterministic UUID v5 chunk IDs and a separate local Trash and Restore exercise now preserve chunk IDs, document IDs, and lineage for one TXT, DOCX, and PDF fixture each; a manual multi-chunk rebuild exercise remains unrecorded.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
-- The local F02 remediation snapshotted and removed 337 report-only derived chunks, after which the audit reported consistent stores. Future report-only drift still requires an explicit retention, review, and cleanup policy.
+- The local F02 remediation snapshotted and removed 337 report-only derived chunks, after which the audit reported consistent stores. Future report-only drift remains manual and must follow the documented snapshot, classification, review, exact-ID manifest, apply, and verification procedure; the application does not automate this cleanup.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
 - A small retrieval and answer-level evaluation baseline exists, but it contains only four cases. Answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality are not yet benchmarked.
@@ -235,11 +237,10 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Define a retention, review, and manifest-driven cleanup policy for any future report-only reconciliation drift.
-2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
-3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
-4. Add authentication, authorization, and rate limiting before private beta.
-5. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
+1. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
+2. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
+3. Add authentication, authorization, and rate limiting before private beta.
+4. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 
 ## Update policy
 
