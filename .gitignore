@@ -31,3 +31,5 @@ chroma_db_before_subject_backfill/
 
 .pytest-tmp-*/
 evaluation/observations.local-*.json
+
+evaluation/answer_observations.local-*.json
