@@ -151,7 +151,7 @@ function SubjectLifecyclePanel({
       setSuccess(
         `Đã đưa ${subject.name} vào thùng rác. `
         + `${result.processed_documents} tài liệu và `
-        + `${result.deleted_chunks} chunks đã được xử lý.`,
+        + `${result.deleted_chunks} đoạn dữ liệu đã được xử lý.`,
       )
     } catch (requestError) {
       setError(
@@ -187,7 +187,7 @@ function SubjectLifecyclePanel({
       setSuccess(
         `Đã khôi phục ${subject.name}. `
         + `${result.processed_documents} tài liệu và `
-        + `${result.indexed_chunks} chunks đã được lập chỉ mục lại.`,
+        + `${result.indexed_chunks} đoạn dữ liệu đã được lập chỉ mục lại.`,
       )
     } catch (requestError) {
       setError(
@@ -270,7 +270,7 @@ function SubjectLifecyclePanel({
         <section className="subject-column">
           <div className="subject-column-heading">
             <div>
-              <span className="subject-column-kicker">Active</span>
+              <span className="subject-column-kicker">Đang dùng</span>
               <h2>Môn học đang hoạt động</h2>
             </div>
             <span className="subject-count">{activeSubjects.length}</span>
@@ -320,7 +320,7 @@ function SubjectLifecyclePanel({
         <section className="subject-column subject-trash-column">
           <div className="subject-column-heading">
             <div>
-              <span className="subject-column-kicker">Recoverable</span>
+              <span className="subject-column-kicker">Có thể khôi phục</span>
               <h2>Thùng rác</h2>
             </div>
             <span className="subject-count">{trashSubjects.length}</span>

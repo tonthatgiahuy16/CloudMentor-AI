@@ -1,3 +1,7 @@
+/*
+ * Legacy three-page shell retained temporarily for diff review.
+ * The active application entry point is WorkspaceApp.tsx.
+ *
 import { useEffect, useState } from 'react'
 
 import ChatPanel from './components/ChatPanel'
@@ -329,3 +333,6 @@ function App() {
 }
 
 export default App
+*/
+
+export { default } from './WorkspaceApp'

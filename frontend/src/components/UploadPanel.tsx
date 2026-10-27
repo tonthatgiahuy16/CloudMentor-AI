@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type {
   DragEvent,
   FormEvent,
@@ -6,7 +6,6 @@ import type {
 
 import {
   createSubject,
-  getSubjects,
   uploadDocument,
 } from '../services/api'
 import type { SubjectRecord } from '../types/subject'
@@ -41,58 +40,30 @@ function isSupportedDocument(
 }
 
 interface UploadPanelProps {
+  subjects: SubjectRecord[]
+  subjectId: string
+  onSubjectChange: (subjectId: string) => void
+  onSubjectCreated: (subject: SubjectRecord) => void
   onUploaded: () => Promise<void>
 }
 
 function UploadPanel({
+  subjects,
+  subjectId,
+  onSubjectChange,
+  onSubjectCreated,
   onUploaded,
 }: UploadPanelProps) {
   const formRef = useRef<HTMLFormElement>(null)
 
-  const [subjects, setSubjects] = useState<SubjectRecord[]>([])
-  const [subjectId, setSubjectId] = useState('')
   const [newSubjectName, setNewSubjectName] = useState('')
   const [chapter, setChapter] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true)
   const [isCreatingSubject, setIsCreatingSubject] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isActive = true
-
-    async function loadSubjects() {
-      try {
-        const result = await getSubjects()
-
-        if (isActive) {
-          setSubjects(result)
-          setSubjectId(result[0]?.subject_id ?? '')
-        }
-      } catch (requestError) {
-        if (isActive) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'Không thể tải danh sách môn học',
-          )
-        }
-      } finally {
-        if (isActive) {
-          setIsLoadingSubjects(false)
-        }
-      }
-    }
-
-    void loadSubjects()
-
-    return () => {
-      isActive = false
-    }
-  }, [])
 
   async function handleCreateSubject(
     event: FormEvent<HTMLFormElement>,
@@ -109,12 +80,7 @@ function UploadPanel({
     try {
       const created = await createSubject(name)
 
-      setSubjects((current) => (
-        [...current, created].sort((left, right) => (
-          left.name.localeCompare(right.name, 'vi')
-        ))
-      ))
-      setSubjectId(created.subject_id)
+      onSubjectCreated(created)
       setNewSubjectName('')
       setSuccess(`Đã thêm môn học ${created.name}`)
     } catch (requestError) {
@@ -255,7 +221,7 @@ function UploadPanel({
       })
 
       setSuccess(
-        `Đã xử lý ${result.filename} thành ${result.chunks} chunks`,
+        `Đã xử lý ${result.filename} thành ${result.chunks} đoạn dữ liệu`,
       )
       setFile(null)
       setChapter('')
@@ -277,16 +243,42 @@ function UploadPanel({
     <section className="upload-panel">
       <div className="upload-heading">
         <div>
-          <span className="eyebrow">Document ingestion</span>
+          <span className="eyebrow">Nạp dữ liệu</span>
           <h2>Tải tài liệu mới</h2>
           <p>
-            PDF, TXT và DOCX sẽ được xử lý, chia chunks
+            PDF, TXT và DOCX sẽ được xử lý, chia đoạn dữ liệu
             và lập chỉ mục tìm kiếm.
           </p>
         </div>
         <span className="upload-limit">
           PDF · TXT · DOCX · tối đa 10 MB
         </span>
+      </div>
+
+      <div className="ingestion-context">
+        <div>
+          <span>Đích nạp dữ liệu</span>
+          <strong>
+            {subjects.find((subject) => subject.subject_id === subjectId)?.name
+              ?? 'Chưa chọn môn học'}
+          </strong>
+        </div>
+        <label className="form-field compact-subject-field">
+          <span>Đổi môn học</span>
+          <select
+            value={subjectId}
+            onChange={(event) => onSubjectChange(event.target.value)}
+            disabled={subjects.length === 0}
+          >
+            {subjects.length === 0 ? (
+              <option value="">Chưa có môn học</option>
+            ) : subjects.map((subject) => (
+              <option key={subject.subject_id} value={subject.subject_id}>
+                {subject.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <form
@@ -320,34 +312,8 @@ function UploadPanel({
         ref={formRef}
         onSubmit={handleSubmit}
       >
-        <label className="form-field">
-          <span>Môn học</span>
-          <select
-            value={subjectId}
-            onChange={(event) => setSubjectId(event.target.value)}
-            disabled={isLoadingSubjects || subjects.length === 0}
-          >
-            {subjects.length === 0 ? (
-              <option value="">
-                {isLoadingSubjects
-                  ? 'Đang tải môn học...'
-                  : 'Chưa có môn học'}
-              </option>
-            ) : (
-              subjects.map((subject) => (
-                <option
-                  key={subject.subject_id}
-                  value={subject.subject_id}
-                >
-                  {subject.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-
         <label className="form-field chapter-field">
-          <span>Chapter</span>
+          <span>Chương</span>
           <input
             type="number"
             min="1"
@@ -389,7 +355,6 @@ function UploadPanel({
           type="submit"
           disabled={
             isUploading
-            || isLoadingSubjects
             || subjects.length === 0
           }
         >

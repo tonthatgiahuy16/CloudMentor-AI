@@ -1,64 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 
-import {
-  askQuestion,
-  getSubjects,
-} from '../services/api'
+import { askQuestion } from '../services/api'
 import type {
   ChatResponse,
   ChatSource,
 } from '../types/chat'
 import type { DocumentRecord } from '../types/document'
-import type { SubjectRecord } from '../types/subject'
 
 import ReactMarkdown from 'react-markdown'
 
 interface ChatPanelProps {
   documents: DocumentRecord[]
+  subjectId: string
+  subjectName: string
 }
 
-function ChatPanel({ documents }: ChatPanelProps) {
+function ChatPanel({
+  documents,
+  subjectId,
+  subjectName,
+}: ChatPanelProps) {
   const [question, setQuestion] = useState('')
-  const [subjects, setSubjects] = useState<SubjectRecord[]>([])
-  const [subjectId, setSubjectId] = useState('')
-  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true)
   const [result, setResult] = useState<ChatResponse | null>(null)
   const [isAsking, setIsAsking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-  let isActive = true
-
-  async function loadSubjects() {
-    try {
-      const result = await getSubjects()
-
-      if (isActive) {
-        setSubjects(result)
-        setSubjectId(result[0]?.subject_id ?? '')
-      }
-    } catch (requestError) {
-      if (isActive) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'Không thể tải danh sách môn học',
-        )
-      }
-    } finally {
-      if (isActive) {
-        setIsLoadingSubjects(false)
-      }
-    }
-  }
-
-  void loadSubjects()
-
-  return () => {
-    isActive = false
-  }
-}, [])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -71,7 +37,7 @@ function ChatPanel({ documents }: ChatPanelProps) {
     setResult(null)
 
     try {
-      setResult(await askQuestion(text, subjectId,))
+      setResult(await askQuestion(text, subjectId))
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -83,16 +49,6 @@ function ChatPanel({ documents }: ChatPanelProps) {
     }
   }
 
-  function handleSubjectChange(nextSubjectId: string) {
-    setSubjectId(nextSubjectId)
-    setResult(null)
-    setError(null)
-  }
-
-  const selectedSubject = subjects.find(
-    (subject) => subject.subject_id === subjectId,
-  )
-
   function getDocumentName(documentId: string, fallback: string) {
     return documents.find(
       (document) => document.document_id === documentId,
@@ -100,102 +56,96 @@ function ChatPanel({ documents }: ChatPanelProps) {
   }
 
   return (
-    <section className="chat-panel" aria-label="Trò chuyện với tài liệu">
-      <form onSubmit={handleSubmit}>
-        <div className="chat-context">
-          <div className="chat-context-copy">
-            <span className="chat-context-icon" aria-hidden="true">M</span>
-            <div>
-              <label htmlFor="chat-subject">Môn học đang hỏi</label>
-              <p>Chỉ tìm câu trả lời trong tài liệu của môn đã chọn.</p>
-            </div>
-          </div>
-
-          <div className="chat-select-wrap">
-            <select
-              id="chat-subject"
-              value={subjectId}
-              onChange={(event) => handleSubjectChange(event.target.value)}
-              disabled={isLoadingSubjects || subjects.length === 0}
-              aria-label="Chọn môn học để tìm kiếm"
-            >
-              {subjects.length === 0 ? (
-                <option value="">
-                  {isLoadingSubjects
-                    ? 'Đang tải môn học...'
-                    : 'Chưa có môn học'}
-                </option>
-              ) : (
-                subjects.map((subject) => (
-                  <option
-                    key={subject.subject_id}
-                    value={subject.subject_id}
-                  >
-                    {subject.name}
-                  </option>
-                ))
-              )}
-            </select>
-            <span className="chat-select-arrow" aria-hidden="true">⌄</span>
+    <section className="chat-workspace" aria-label="Trò chuyện với tài liệu">
+      <div className="chat-main-column">
+        <div className="chat-scope-banner">
+          <span className="chat-context-icon" aria-hidden="true">S</span>
+          <div>
+            <span>Phạm vi truy xuất</span>
+            <strong>{subjectName || 'Chưa chọn môn học'}</strong>
+            <p>{documents.length} nguồn đang hoạt động trong phạm vi này.</p>
           </div>
         </div>
 
-        {selectedSubject && (
-          <p className="chat-scope-note">
-            Phạm vi hiện tại: <strong>{selectedSubject.name}</strong>
-          </p>
-        )}
+        <div className="chat-panel">
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="chat-question">Câu hỏi của bạn</label>
+            <textarea
+              id="chat-question"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              maxLength={2000}
+              rows={5}
+              placeholder="Đặt câu hỏi dựa trên các nguồn đã lập chỉ mục..."
+            />
+            <div className="chat-submit-row">
+              <span>Câu trả lời sẽ giữ trích dẫn từ dữ liệu nguồn.</span>
+              <button type="submit" disabled={
+                isAsking
+                || !question.trim()
+                || !subjectId
+              }>
+                {isAsking ? 'Đang truy xuất...' : 'Tìm câu trả lời'}
+              </button>
+            </div>
+          </form>
 
-        <label htmlFor="chat-question">Câu hỏi của bạn</label>
-        <textarea
-          id="chat-question"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          maxLength={2000}
-          rows={4}
-          placeholder="Ví dụ: Cloud computing là gì?"
-        />
-        <button type="submit" disabled={
-          isAsking
-          || !question.trim()
-          || !subjectId
-          || isLoadingSubjects
-        }>
-          {isAsking ? 'Đang tìm câu trả lời...' : 'Gửi câu hỏi'}
-        </button>
-      </form>
+          {isAsking && (
+            <p className="chat-status" role="status">
+              Đang truy xuất evidence trong {subjectName}...
+            </p>
+          )}
+          {error && <p className="chat-error" role="alert">{error}</p>}
 
-      {isAsking && (
-        <p className="chat-status" role="status">
-          Đang tìm trong tài liệu...
-        </p>
-      )}
-      {error && <p role="alert">{error}</p>}
-
-      {result && (
-        <div className="chat-result">
-          <h2>Câu trả lời</h2>
-          <div className="chat-answer">
-            <ReactMarkdown>{result.answer}</ReactMarkdown>
-          </div>
-
-          {result.sources.length > 0 && (
-            <div className="chat-sources">
-              <h3>Nguồn tham khảo</h3>
-              <ul>
-                {result.sources.map((source) => (
-                  <li key={source.chunk_id}>
-                    {getDocumentName(
-                      source.document_id,
-                      source.source,
-                    )} — {formatSourceLocation(source)}
-                  </li>
-                ))}
-              </ul>
+          {result ? (
+            <div className="chat-result">
+              <span className="panel-kicker">Câu trả lời có nguồn</span>
+              <h2>Câu trả lời</h2>
+              <div className="chat-answer">
+                <ReactMarkdown>{result.answer}</ReactMarkdown>
+              </div>
+            </div>
+          ) : (
+            <div className="chat-empty-answer">
+              <strong>Sẵn sàng truy vấn kho tri thức</strong>
+              <span>Câu trả lời sẽ xuất hiện tại đây và giữ liên kết tới nguồn.</span>
             </div>
           )}
         </div>
-      )}
+      </div>
+
+      <aside className="evidence-panel" aria-label="Evidence">
+        <div className="evidence-heading">
+          <div>
+            <span className="panel-kicker">Truy vết nguồn</span>
+            <h2>Nguồn đối chiếu</h2>
+          </div>
+          <span className="evidence-count">{result?.sources.length ?? 0}</span>
+        </div>
+
+        {result && result.sources.length > 0 ? (
+          <ol className="evidence-list">
+            {result.sources.map((source) => (
+              <li key={source.chunk_id}>
+                <span className="evidence-index">{source.chunk_index + 1}</span>
+                <div>
+                  <strong>
+                    {getDocumentName(source.document_id, source.source)}
+                  </strong>
+                  <span>{formatSourceLocation(source)}</span>
+                  <code>{source.document_id}</code>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="evidence-empty">
+            <span className="evidence-empty-mark" aria-hidden="true">↳</span>
+            <strong>Chưa có nguồn đối chiếu</strong>
+            <p>Nguồn và vị trí trích dẫn sẽ xuất hiện sau khi có câu trả lời.</p>
+          </div>
+        )}
+      </aside>
     </section>
   )
 }
