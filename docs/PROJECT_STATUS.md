@@ -7,12 +7,12 @@ This document records the implementation status of CloudMentor AI at a specific 
 | Field | Value |
 | --- | --- |
 | Snapshot date | 2026-10-27 |
-| Application baseline | `5ffbe2912eac12a9687cb8f323fe7ac04b589f2d` |
-| Current milestone | Phase 2.5 reliability evidence collected; F01 and F02 remain open |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery; it also found non-stable chunk IDs across rebuild and pre-existing local Chroma drift. |
+| Application baseline | `d964367574166c50921932c11127957081e260b5` |
+| Current milestone | F02 drift remediated locally with a prevention guard; F01 remains open |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery. Its report identified F01 (non-stable chunk IDs) and F02 (local Chroma drift); F02 was subsequently remediated locally and a pipeline failure cleanup guard was added. |
 | CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PRs #39 and #41; feature commit `f67f448` was locally verified with 320 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
 
-This status reflects the application baseline at `5ffbe2912eac12a9687cb8f323fe7ac04b589f2d`. The Phase 2.5 local evidence run is documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); it does not establish production readiness or authorize a private beta.
+This status reflects the application baseline at `d964367574166c50921932c11127957081e260b5`. The Phase 2.5 local evidence run and its post-evidence F02 remediation are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
 
 ## Current capability
 
@@ -80,6 +80,7 @@ A live local recovery was verified on 2026-10-17 against the application state m
 
 - The full backend suite passed locally against retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` with `313 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The local run used a project-local pytest temporary directory because the default Windows pytest temp root was inaccessible.
 - The full backend suite passed locally against answer-evaluation feature commit `f67f448` with `320 passed, 3 skipped` and the same existing warning. This run also used a project-local pytest temporary directory.
+- The full backend suite passed locally against F02 prevention commit `d964367574166c50921932c11127957081e260b5` with `322 passed, 3 skipped`, and one existing warning. Focused PDF-service and lifecycle regression scopes also passed.
 - Frontend ESLint and the TypeScript/Vite production build passed locally with 180 modules transformed.
 - `tests/test_document_lifecycle_e2e.py` covers PDF, TXT, and DOCX subject creation, upload, `INDEXED` state, subject-scoped retrieval with format-aware source lineage, deletion, PostgreSQL lifecycle state, Chroma removal, repeated upload behavior, failed-document retry, and retained-source rebuild.
 - The lifecycle test uses SQLite in memory, an isolated temporary Chroma directory, real TXT reading and DOCX paragraph parsing, and deterministic substitutes for heavyweight PDF extraction, embedding, and answer generation.
@@ -111,6 +112,17 @@ Verified on 2026-10-27 on `feat/rag-answer-evaluation`; the evaluated changes we
 - `python -m evaluation.run_answer_score` reported `answerable_case_count=3`, `answer_correct_count=3`, `citation_hit_count=3`, `faithful_count=3`, `unanswerable_case_count=1`, and `refusal_correct_count=1`, with each rate equal to `1.0` on this narrow dataset.
 
 Result: **passed for the narrow answer-level baseline**. Correctness, faithfulness, and refusal are human-reviewed labels; this result does not establish broad model quality or production readiness.
+
+Verified on 2026-10-27 on `feat/reconciliation-drift-remediation` at `d964367574166c50921932c11127957081e260b5`:
+
+- Inventoried 83 Chroma chunks with no `document_id` or `subject_id`; all referenced a filename absent from PostgreSQL, so no safe metadata backfill was attempted.
+- Identified 254 derived chunks attached to two `FAILED` documents with incomplete retained-source metadata, so no retry or rebuild was attempted.
+- Wrote a local JSON snapshot of all 337 exact target chunks, including their text and metadata, with SHA-256 `5c5624decb0c9e42a29821d85b25d567a8ae13bedd48a4926014db6bf4bef76a`.
+- Removed those 337 Chroma chunks only; PostgreSQL rows, subjects, and retained sources were not deleted.
+- The post-cleanup audit returned `Stores are consistent.` with 10 expected indexed documents, 466 Chroma chunks, and zero records in every drift category.
+- Added a failure-path guard that attempts derived-vector cleanup before recording a document as `FAILED`; regression tests cover both successful cleanup and cleanup failure without masking the original pipeline error.
+
+Result: **F02 remediated locally**. The cleanup was operator-approved and snapshot-backed; it does not add a generic automatic policy for future report-only drift.
 
 Verified on 2026-10-21 against `feat/controlled-reconciliation-repair` at `f263589829661ef1e0a7304c5a4e3922573b9773`:
 
@@ -212,7 +224,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
 - Phase 2.5 evidence found that Chroma `chunk_id` values are regenerated during rebuild. Document identity and source lineage remain available, but stable chunk identity is not currently satisfied.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
-- The local reconciliation audit found 83 chunks without `document_id` lineage and 254 chunks belonging to two known `FAILED` documents. These report-only categories remain unresolved and local stores must not be described as consistent.
+- The local F02 remediation snapshotted and removed 337 report-only derived chunks, after which the audit reported consistent stores. Future report-only drift still requires an explicit retention, review, and cleanup policy.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
 - A small retrieval and answer-level evaluation baseline exists, but it contains only four cases. Answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality are not yet benchmarked.
@@ -224,7 +236,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 ## Next milestone priorities
 
 1. Resolve the stable chunk-identity contract or explicitly revise it, then rerun the affected rebuild and recovery evidence.
-2. Define a retention, review, and repair policy for the 83 missing-lineage chunks and the two known failed-document chunk sets before making a cross-store consistency claim.
+2. Define a retention, review, and manifest-driven cleanup policy for any future report-only reconciliation drift.
 3. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
 4. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
 5. Add authentication, authorization, and rate limiting before private beta.
