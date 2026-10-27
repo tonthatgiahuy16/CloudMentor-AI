@@ -332,9 +332,26 @@ class PDFService:
             return len(chunks)
 
         except Exception as exc:
+            cleanup_error = None
+
+            try:
+                self.index.delete_by_document_id(
+                    document_id
+                )
+            except Exception as deletion_exc:
+                cleanup_error = deletion_exc
+
+            error_message = str(exc)
+
+            if cleanup_error is not None:
+                error_message = (
+                    f"{error_message}; derived vector cleanup "
+                    f"failed: {cleanup_error}"
+                )
+
             self.document_repo.mark_failed(
                 document_id=document_id,
                 failed_stage=stage,
-                error_message=str(exc),
+                error_message=error_message,
             )
             raise

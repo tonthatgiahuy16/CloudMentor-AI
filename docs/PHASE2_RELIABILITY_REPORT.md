@@ -173,7 +173,7 @@
 - The local PostgreSQL-Chroma state is not consistent and must not be reported as reconciled.
 - No repair mutation was run against this existing local drift.
 
-## Open findings
+## Findings
 
 ### F01 - Chunk IDs are not stable across rebuild
 
@@ -182,8 +182,8 @@ The R05 Restore exercise preserved document identity and source lineage, but gen
 
 ### F02 - Existing local Chroma drift
 
-**Status:** Open
-R06 found 83 chunks without `document_id` plus 254 chunks belonging to two known `FAILED` documents. Current reconciliation repair intentionally reports these categories but does not repair them automatically.
+**Status:** Remediated locally after the evidence run
+R06 found 83 chunks without `document_id` plus 254 chunks belonging to two known `FAILED` documents. The local remediation created a snapshot and removed exactly those 337 derived chunks; a post-cleanup audit reported consistent stores. Current reconciliation repair still intentionally reports these categories rather than repairing them automatically.
 
 ## R07 - Controlled drift detection and recovery
 
@@ -251,8 +251,27 @@ All R01-R08 cases now have observed results.
 | --- | --- |
 | Evidence collection | Complete |
 | Valid ingestion, validation, duplicate protection, retry, lifecycle, controlled repair, and stale recovery | Demonstrated within the stated local scopes |
-| Local PostgreSQL-Chroma consistency | Failed because F02 remains open |
+| Local PostgreSQL-Chroma consistency | Failed during the evidence run because F02 was open |
 | Stable chunk identity | Failed because F01 remains open |
 | Production readiness or private-beta authorization | Not established by this evidence run |
 
-Phase 2.5 evidence collection is complete, but the reliability objective is not approved as complete until F01 and F02 are resolved or their contracts are explicitly revised.
+At the end of the evidence run, the reliability objective was not approved as complete until F01 and F02 were resolved or their contracts were explicitly revised. F02 was remediated locally afterward; F01 remains open.
+
+## Post-evidence F02 remediation
+
+**Status:** `remediated locally`
+**Scope:** Exact Chroma cleanup after an inventory-only review. PostgreSQL rows, subjects, and retained sources were not deleted.
+
+| Check | Observed result |
+| --- | --- |
+| Snapshot target count | 337 derived chunks |
+| Snapshot composition | 83 `missing_lineage` chunks and 254 chunks for known non-expected documents |
+| Snapshot SHA-256 | `5c5624decb0c9e42a29821d85b25d567a8ae13bedd48a4926014db6bf4bef76a` |
+| Cleanup result | 337 of 337 exact snapshot chunk IDs deleted from Chroma |
+| Post-cleanup reconciliation | `Expected documents: 10`, `Chroma chunks: 466`, zero missing indexed documents, zero missing-lineage chunks, zero unknown chunks, zero known non-expected documents, and zero subject mismatches |
+| Post-cleanup audit | `Stores are consistent.` with exit code 0 in 2.238 s |
+| Prevention guard | Pipeline failures now attempt `delete_by_document_id` before recording `FAILED`; focused regression tests and the full backend suite passed |
+
+### Remaining limitation
+
+- This was a local, operator-approved cleanup based on a local snapshot. The application still has no generic committed manifest workflow for future report-only drift; a future operator policy must decide retention, review, and explicit cleanup criteria.
