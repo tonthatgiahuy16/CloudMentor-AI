@@ -206,6 +206,113 @@ def test_processing_failure_records_failed_stage():
     service.chunk.run.assert_not_called()
 
 
+def test_index_failure_cleans_up_vectors_before_marking_failed():
+    service = PDFService.__new__(PDFService)
+
+    service.document_repo = Mock()
+    service.extract = Mock()
+    service.transform = Mock()
+    service.chunk = Mock()
+    service.embedding = Mock()
+    service.index = Mock()
+
+    service.extract.run.return_value = [object()]
+    service.transform.run.return_value = [object()]
+    service.chunk.run.return_value = [object()]
+    service.embedding.run.return_value = object()
+
+    call_log = []
+
+    def fail_index(*_args):
+        call_log.append("index_run")
+        raise RuntimeError("Controlled index failure")
+
+    def cleanup_vectors(document_id):
+        assert document_id == "failed-document-id"
+        call_log.append("vector_cleanup")
+
+    def mark_failed(**_kwargs):
+        call_log.append("mark_failed")
+
+    service.index.run.side_effect = fail_index
+    service.index.delete_by_document_id.side_effect = (
+        cleanup_vectors
+    )
+    service.document_repo.mark_failed.side_effect = mark_failed
+
+    with pytest.raises(
+        RuntimeError,
+        match="Controlled index failure",
+    ):
+        service._process_document(
+            source_data=b"%PDF-1.4\nretained",
+            filename="retained.pdf",
+            file_type="pdf",
+            document_id="failed-document-id",
+            subject_id="subject-id",
+        )
+
+    assert call_log == [
+        "index_run",
+        "vector_cleanup",
+        "mark_failed",
+    ]
+    service.index.delete_by_document_id.assert_called_once_with(
+        "failed-document-id"
+    )
+    service.document_repo.mark_failed.assert_called_once_with(
+        document_id="failed-document-id",
+        failed_stage="INDEX",
+        error_message="Controlled index failure",
+    )
+
+
+def test_index_failure_marks_failed_when_vector_cleanup_fails():
+    service = PDFService.__new__(PDFService)
+
+    service.document_repo = Mock()
+    service.extract = Mock()
+    service.transform = Mock()
+    service.chunk = Mock()
+    service.embedding = Mock()
+    service.index = Mock()
+
+    service.extract.run.return_value = [object()]
+    service.transform.run.return_value = [object()]
+    service.chunk.run.return_value = [object()]
+    service.embedding.run.return_value = object()
+    service.index.run.side_effect = RuntimeError(
+        "Controlled index failure"
+    )
+    service.index.delete_by_document_id.side_effect = (
+        RuntimeError("Controlled cleanup failure")
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Controlled index failure",
+    ):
+        service._process_document(
+            source_data=b"%PDF-1.4\nretained",
+            filename="retained.pdf",
+            file_type="pdf",
+            document_id="failed-document-id",
+            subject_id="subject-id",
+        )
+
+    service.index.delete_by_document_id.assert_called_once_with(
+        "failed-document-id"
+    )
+    service.document_repo.mark_failed.assert_called_once_with(
+        document_id="failed-document-id",
+        failed_stage="INDEX",
+        error_message=(
+            "Controlled index failure; derived vector cleanup "
+            "failed: Controlled cleanup failure"
+        ),
+    )
+
+
 @pytest.mark.parametrize(
     "status",
     [
