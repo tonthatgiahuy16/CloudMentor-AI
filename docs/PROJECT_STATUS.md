@@ -7,12 +7,12 @@ This document records the implementation status of CloudMentor AI at a specific 
 | Field | Value |
 | --- | --- |
 | Snapshot date | 2026-10-27 |
-| Application baseline | `1e1d8ba3bbffef9a9236f8b7a2f5fe970f0653e3` |
-| Current milestone | Phase 2 locked; retrieval and answer-level evaluation baselines added |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. |
+| Application baseline | `5ffbe2912eac12a9687cb8f323fe7ac04b589f2d` |
+| Current milestone | Phase 2.5 reliability evidence collected; F01 and F02 remain open |
+| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery; it also found non-stable chunk IDs across rebuild and pre-existing local Chroma drift. |
 | CI evidence | GitHub Actions backend, frontend, container-backed MinIO recovery, and PostgreSQL concurrent-ingestion checks passed through PRs #39 and #41; feature commit `f67f448` was locally verified with 320 backend tests passing, 3 skipped, and one existing Starlette `TestClient` dependency deprecation warning. |
 
-The status was captured against `main` at merge commit `1e1d8ba3bbffef9a9236f8b7a2f5fe970f0653e3`, which includes retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` and answer-evaluation feature commit `f67f448`, before this documentation update receives its own commit.
+This status reflects the application baseline at `5ffbe2912eac12a9687cb8f323fe7ac04b589f2d`. The Phase 2.5 local evidence run is documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); it does not establish production readiness or authorize a private beta.
 
 ## Current capability
 
@@ -197,7 +197,7 @@ Result: **passed**.
 | Subject and document metadata | PostgreSQL | No production backup or restore procedure yet |
 | Document and subject lifecycle state | PostgreSQL | Recovery workflows are operator-invoked rather than scheduled |
 | Accepted PDF, TXT, and DOCX sources | Configured `LocalSourceStorage` or `MinioSourceStorage` | Both adapters support path-independent reads for retry and rebuild; all eight eligible local sources were migrated and verified while their local copies were retained; ten legacy rows still lack complete source metadata, and the verified MinIO service has no independent backup yet |
-| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation has bounded operator repair for orphan chunks and indexed documents with no chunks |
+| Chunk vectors and retrieval metadata | Chroma | Derived and rebuildable when retained source metadata is complete; reconciliation has bounded operator repair for orphan chunks and indexed documents with no chunks, but current rebuilds regenerate chunk IDs |
 | Generated answers | API response | Not treated as a durable application record |
 
 PostgreSQL is the system of record for identity, metadata, and lifecycle state. Chroma is a derived retrieval index. Chroma can be audited against PostgreSQL and rebuilt through subject restore when a valid retained source exists. The storage boundary removes filesystem assumptions from extraction and lifecycle recovery, while the current MinIO guarantee remains local because the service and its volume are not independently backed up or operated as production infrastructure.
@@ -210,7 +210,9 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - MinIO recovery has container-backed CI coverage, but the deployed local MinIO service remains manually operated.
 - Concurrent duplicate protection is implemented at the PostgreSQL boundary; production throughput, timeout, and contention behavior is not yet benchmarked.
 - Stale-ingestion recovery and legacy-source repair require an operator to run a CLI or initiate restore.
+- Phase 2.5 evidence found that Chroma `chunk_id` values are regenerated during rebuild. Document identity and source lineage remain available, but stable chunk identity is not currently satisfied.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded to orphan chunks and `INDEXED` documents with no chunks; missing lineage, known non-expected documents, and subject mismatches still require operator review.
+- The local reconciliation audit found 83 chunks without `document_id` lineage and 254 chunks belonging to two known `FAILED` documents. These report-only categories remain unresolved and local stores must not be described as consistent.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
 - A small retrieval and answer-level evaluation baseline exists, but it contains only four cases. Answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality are not yet benchmarked.
@@ -221,11 +223,12 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 ## Next milestone priorities
 
-1. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
-2. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
-3. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
-4. Define retention, review, and repair policy for legacy rows with incomplete source metadata and report-only reconciliation drift.
+1. Resolve the stable chunk-identity contract or explicitly revise it, then rerun the affected rebuild and recovery evidence.
+2. Define a retention, review, and repair policy for the 83 missing-lineage chunks and the two known failed-document chunk sets before making a cross-store consistency claim.
+3. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
+4. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
 5. Add authentication, authorization, and rate limiting before private beta.
+6. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 
 ## Update policy
 
