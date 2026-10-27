@@ -41,4 +41,6 @@ python_files = [
   "test_rag_evaluation_dataset.py",
   "test_rag_evaluation_scoring.py",
   "test_rag_evaluation_runner.py",
+  "test_rag_answer_scoring.py",
+  "test_rag_answer_runner.py",
 ]
