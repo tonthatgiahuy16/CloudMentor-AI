@@ -1,0 +1,11 @@
+Data Engineering Fundamentals — Chương 4: Orchestration và Observability
+
+Orchestration điều phối thứ tự, lịch chạy, dependency và retry của các job. Một DAG biểu diễn quan hệ phụ thuộc có hướng, không chu trình: ví dụ ingest_raw chạy trước validate_raw, validate_raw chạy trước build_orders_clean, rồi dashboard_refresh chạy cuối.
+
+Scheduler không bảo đảm dữ liệu đúng. Mỗi task vẫn cần input/output contract và quality gate. Retry chỉ nên dùng cho lỗi tạm thời như network timeout; retry vô hạn với schema sai hoặc credential sai làm chậm phát hiện incident.
+
+Observability là khả năng quan sát hệ thống qua logs, metrics và traces. Logs trả lời chi tiết một lần chạy đã làm gì. Metrics cho biết xu hướng như số batch failed, latency hoặc số record rejected. Trace hoặc correlation_id liên kết các bước của cùng một request hay batch.
+
+Các tín hiệu tối thiểu cho pipeline gồm run_id, source batch_id, số record nhận/accepted/rejected, thời lượng từng stage, watermark hoặc freshness, error category và output location. Alert nên gắn với owner và runbook; alert không có người xử lý chỉ tạo nhiễu.
+
+Recovery cần được thiết kế trước khi có incident. Ví dụ khi derived vector index mất dữ liệu, operator có thể so sánh PostgreSQL registry với index, lập manifest record thiếu và rebuild từ canonical source. Rebuild không thay thế backup: nếu canonical source hoặc PostgreSQL mất, derived index không thể khôi phục dữ liệu gốc.

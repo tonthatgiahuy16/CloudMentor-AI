@@ -1,0 +1,9 @@
+{
+  "subject": "Data Engineering Fundamentals",
+  "documents": [
+    {"filename": "01-data-pipelines.txt", "chapter": 1},
+    {"filename": "02-data-quality-lineage.txt", "chapter": 2},
+    {"filename": "03-warehousing-lakehouse.txt", "chapter": 3},
+    {"filename": "04-orchestration-observability.txt", "chapter": 4}
+  ]
+}

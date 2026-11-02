@@ -21,6 +21,13 @@ class SubjectRepository:
             .first()
         )
 
+    def get_by_name(self, name: str) -> Subject | None:
+        return (
+            self.db.query(Subject)
+            .filter(Subject.name == name)
+            .first()
+        )
+
 
     def list_all(self) -> list[Subject]:
         return (

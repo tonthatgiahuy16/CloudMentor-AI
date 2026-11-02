@@ -82,6 +82,9 @@ CHAT_RATE_LIMIT_PER_MINUTE = int(
     os.getenv("CHAT_RATE_LIMIT_PER_MINUTE", "12")
 )
 
+DEMO_SEED_TOKEN = os.getenv("DEMO_SEED_TOKEN", "")
+DEMO_SEED_DIR = Path(os.getenv("DEMO_SEED_DIR", BASE_DIR / "demo-sources"))
+
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)

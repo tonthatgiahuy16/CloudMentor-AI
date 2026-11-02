@@ -1,0 +1,11 @@
+Data Engineering Fundamentals — Chương 1: Data Pipeline và ETL/ELT
+
+Data pipeline là chuỗi bước biến dữ liệu đầu vào thành dữ liệu có thể dùng được cho sản phẩm, phân tích hoặc Machine Learning. Một pipeline nhỏ thường có các bước: ingest dữ liệu, validate, transform, lưu kết quả và publish cho consumer.
+
+ETL là Extract, Transform, Load: dữ liệu được biến đổi trước khi nạp vào kho đích. ELT là Extract, Load, Transform: dữ liệu gốc được nạp trước, sau đó biến đổi trong data warehouse. ETL hợp khi cần kiểm soát dữ liệu nhạy cảm hoặc chuẩn hóa trước khi lưu; ELT hợp khi warehouse có năng lực xử lý tốt và cần giữ dữ liệu gốc để tái sử dụng.
+
+Ví dụ: một hệ thống nhận file CSV đơn hàng mỗi ngày. Pipeline kiểm tra schema, loại các dòng thiếu order_id, chuẩn hóa thời gian sang UTC, rồi ghi bảng orders_clean. Bảng này có grain là một dòng cho một order_id. Nếu source có nhiều dòng cho cùng order_id, pipeline phải xác định rõ liệu đó là update, line item hay duplicate.
+
+Idempotency nghĩa là chạy lại cùng một input không tạo thêm business effect. Với ví dụ đơn hàng, dùng order_id làm business key và upsert thay vì insert mù giúp rerun an toàn. Idempotency không giống retry: retry là thử lại khi lỗi; idempotency là thuộc tính khiến retry không nhân đôi kết quả.
+
+Một pipeline đáng tin cậy cần lưu input hoặc reference tới input, version transform và trạng thái xử lý. Khi bước transform lỗi sau khi input đã được lưu, operator có thể retry từ input đã giữ thay vì yêu cầu source gửi lại file.

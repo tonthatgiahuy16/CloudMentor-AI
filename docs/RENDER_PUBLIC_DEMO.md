@@ -28,12 +28,12 @@ multi-instance rate-limit store, or monitoring/alerting.
 
 ## Seed before sharing
 
-Only upload three or four documents whose public-demo redistribution rights
-are known. Use one narrowly scoped subject, verify each document reaches
-`INDEXED`, then ask representative questions and check the returned citations.
-After seeding, keep `DEMO_MODE=true`; the API rejects subject creation, upload,
-document deletion, subject deletion, and subject restore even if a caller
-bypasses the frontend.
+The bundled `demo-sources/` files are the only files accepted by the internal
+seed route. Set `DEMO_SEED_TOKEN` as a Render secret, call
+`POST /internal/demo-seed` with that value in `X-Demo-Seed-Token`, then remove
+the secret and redeploy after a successful seed. The route accepts no upload
+or source path from a caller. Keep `DEMO_MODE=true`; public mutation routes
+remain blocked even if a caller bypasses the frontend.
 
 ## Release checks
 

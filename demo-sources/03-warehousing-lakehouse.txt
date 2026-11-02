@@ -1,0 +1,11 @@
+Data Engineering Fundamentals — Chương 3: Data Warehouse và Lakehouse
+
+Data warehouse là hệ thống tối ưu cho truy vấn phân tích có cấu trúc. Dữ liệu thường được mô hình hóa theo fact và dimension. Fact lưu sự kiện đo lường được, ví dụ một giao dịch; dimension lưu bối cảnh mô tả, ví dụ khách hàng, sản phẩm hoặc ngày.
+
+Trước khi tạo bảng fact cần định nghĩa grain. Nếu fact_sales có grain là một order line, mỗi hàng biểu diễn một sản phẩm trong một đơn. Revenue tổng hợp được bằng SUM(amount), nhưng COUNT(*) là số dòng hàng chứ không phải số đơn; số đơn cần COUNT(DISTINCT order_id).
+
+Data lake lưu dữ liệu thô với nhiều định dạng và chi phí thấp hơn. Lakehouse kết hợp lưu trữ linh hoạt của lake với các cơ chế quản trị như transaction, schema enforcement và table format. Dù chọn kiến trúc nào, raw data và curated data nên được phân tách rõ.
+
+Medallion architecture thường gọi các lớp là bronze, silver và gold. Bronze giữ dữ liệu gần source nhất. Silver chuẩn hóa, deduplicate và kiểm tra chất lượng. Gold cung cấp dataset phục vụ use case cụ thể như dashboard hoặc feature. Đây là quy ước tổ chức; điều quan trọng là hợp đồng dữ liệu và owner của mỗi lớp.
+
+PostgreSQL có thể là system of record cho trạng thái nghiệp vụ cần transaction. Một vector index như Chroma phù hợp làm derived index: nó phục vụ retrieval nhưng phải tái tạo được từ canonical source và metadata trong system of record.

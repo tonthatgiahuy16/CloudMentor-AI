@@ -44,4 +44,6 @@ python_files = [
   "test_rag_answer_scoring.py",
   "test_rag_answer_runner.py",
   "test_public_demo_controls.py",
+  "test_demo_seed_api.py",
+  "test_demo_seed_service.py",
 ]

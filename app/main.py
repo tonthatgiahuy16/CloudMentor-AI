@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
+from app.api.demo_seed import router as demo_seed_router
 from app.api.health import router as health_router
 from app.api.upload import router as upload_router
 from app.api.subjects import router as subjects_router
@@ -22,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(demo_seed_router)
 
 app.include_router(
     subjects_router

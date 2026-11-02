@@ -1,0 +1,11 @@
+Data Engineering Fundamentals — Chương 2: Data Quality và Lineage
+
+Data quality là khả năng dữ liệu đáp ứng mục đích sử dụng. Các kiểm tra cơ bản gồm completeness (đầy đủ), validity (hợp lệ), uniqueness (không trùng), consistency (nhất quán) và freshness (kịp thời).
+
+Ví dụ bảng orders_clean yêu cầu order_id không null, amount lớn hơn hoặc bằng 0 và currency thuộc tập mã hợp lệ. Một uniqueness test kiểm tra order_id chỉ xuất hiện một lần nếu grain đã được định nghĩa là một đơn hàng. Test này không phù hợp nếu grain là một dòng hàng trong đơn, khi đó khóa có thể là order_id cộng line_item_id.
+
+Lineage là truy vết nguồn gốc dữ liệu: một output được tạo từ input nào, qua transform nào và ở thời điểm nào. Lineage tốt trả lời được ba câu: dữ liệu này đến từ đâu, ai hoặc job nào đã biến đổi nó, và những output nào sẽ bị ảnh hưởng nếu source sai.
+
+Metadata hữu ích cho lineage gồm source_uri, batch_id, event_time, ingestion_time, schema version, code version và primary key. Với document RAG, document_id và chunk_id phải đi từ retained source đến vector index rồi đến citation trong câu trả lời.
+
+Data quality check là publish gate. Nếu tỷ lệ order_id null vượt ngưỡng, pipeline nên đánh dấu batch failed hoặc quarantined thay vì publish dữ liệu sai. Quarantine giữ dữ liệu lỗi để điều tra; nó không được âm thầm bỏ dữ liệu vì việc bỏ làm mất khả năng giải thích chênh lệch.
