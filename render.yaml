@@ -1,5 +1,6 @@
 databases:
   - name: cloudmentor-demo-db
+    region: singapore
     plan: basic-256mb
     databaseName: cloudmentor
     user: cloudmentor
@@ -8,6 +9,7 @@ services:
   - type: web
     name: cloudmentor-demo-api
     runtime: docker
+    region: singapore
     plan: starter
     numInstances: 1
     healthCheckPath: /readyz
