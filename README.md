@@ -31,6 +31,18 @@ create subject
 
 The lifecycle is covered by automated application-level tests and recorded live local verification. Deterministic test doubles replace external embedding and answer generation in the application-level lifecycle test, and CI does not yet exercise live PostgreSQL, Chroma, embedding, and Gemini as one workflow. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. PostgreSQL-Chroma reconciliation is dry-run-first and can explicitly repair orphan vectors or rebuild an `INDEXED` document with no derived vectors. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
 
+## Local reproducible demo
+
+CloudMentor includes a constrained local demo mode for portfolio evidence. It seeds four public Data Engineering learning sources, keeps the normal source-grounded chat flow available, and blocks public state-changing routes. The seed route requires a temporary token; the public demo UI does not expose upload, create, delete, or restore controls.
+
+The current local evidence was verified on 2026-11-02 at `main` commit `d3ce6b3`: `331 passed, 3 skipped, 1 warning` for the backend suite, with frontend ESLint and the production TypeScript/Vite build also passing. This is local verification, not a deployed public-service claim.
+
+![Local demo library with four seeded and indexed Data Engineering sources](docs/assets/cloudmentor-demo-library.png)
+
+![Local demo answer grounded in seeded sources with chunk-level references](docs/assets/cloudmentor-demo-chat.png)
+
+The optional Render configuration remains a costed deployment path. It is not active deployment evidence; see [`docs/RENDER_PUBLIC_DEMO.md`](docs/RENDER_PUBLIC_DEMO.md) for its operational boundaries.
+
 ## What this project demonstrates
 
 - A modular **Extract -> Transform -> Chunk -> Embed -> Index** pipeline.
