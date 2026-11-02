@@ -15,6 +15,8 @@ import type {
 import type { SubjectRecord } from './types/subject'
 import './WorkspaceApp.css'
 
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+
 const STATUS_LABELS: Record<DocumentStatus, string> = {
   UPLOADED: 'Đã tải lên',
   PROCESSING: 'Đang xử lý',
@@ -283,8 +285,9 @@ function WorkspaceApp() {
                   <span className="eyebrow">Không gian dữ liệu</span>
                   <h1>Thư viện</h1>
                   <p>
-                    Nạp, theo dõi và quản lý vòng đời nguồn học liệu
-                    trong phạm vi môn học đang chọn.
+                    {IS_DEMO_MODE
+                      ? 'Khám phá nguồn học liệu và hỏi đáp trong phạm vi dữ liệu demo.'
+                      : 'Nạp, theo dõi và quản lý vòng đời nguồn học liệu trong phạm vi môn học đang chọn.'}
                   </p>
                 </div>
 
@@ -298,26 +301,28 @@ function WorkspaceApp() {
                 </button>
               </header>
 
-              <div className="workspace-tabs" role="tablist" aria-label="Khu vực thư viện">
-                <button
-                  role="tab"
-                  aria-selected={libraryView === 'sources'}
-                  className={libraryView === 'sources' ? 'active' : ''}
-                  type="button"
-                  onClick={() => setLibraryView('sources')}
-                >
-                  Nguồn dữ liệu
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={libraryView === 'lifecycle'}
-                  className={libraryView === 'lifecycle' ? 'active' : ''}
-                  type="button"
-                  onClick={() => setLibraryView('lifecycle')}
-                >
-                  Vòng đời & khôi phục
-                </button>
-              </div>
+              {!IS_DEMO_MODE && (
+                <div className="workspace-tabs" role="tablist" aria-label="Khu vực thư viện">
+                  <button
+                    role="tab"
+                    aria-selected={libraryView === 'sources'}
+                    className={libraryView === 'sources' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibraryView('sources')}
+                  >
+                    Nguồn dữ liệu
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={libraryView === 'lifecycle'}
+                    className={libraryView === 'lifecycle' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibraryView('lifecycle')}
+                  >
+                    Vòng đời & khôi phục
+                  </button>
+                </div>
+              )}
 
               {error && (
                 <div className="error-banner" role="alert">
@@ -328,7 +333,7 @@ function WorkspaceApp() {
                 </div>
               )}
 
-              {libraryView === 'sources' ? (
+              {(IS_DEMO_MODE || libraryView === 'sources') ? (
                 <>
                   <section className="summary-grid" aria-label="Tổng quan nguồn dữ liệu">
                     <article className="summary-card">
@@ -348,13 +353,15 @@ function WorkspaceApp() {
                     </article>
                   </section>
 
-                  <UploadPanel
-                    subjects={subjects}
-                    subjectId={selectedSubjectId}
-                    onSubjectChange={setSelectedSubjectId}
-                    onSubjectCreated={handleSubjectCreated}
-                    onUploaded={refreshDocuments}
-                  />
+                  {!IS_DEMO_MODE && (
+                    <UploadPanel
+                      subjects={subjects}
+                      subjectId={selectedSubjectId}
+                      onSubjectChange={setSelectedSubjectId}
+                      onSubjectCreated={handleSubjectCreated}
+                      onUploaded={refreshDocuments}
+                    />
+                  )}
 
                   <section className="document-panel" aria-label="Danh sách tài liệu">
                     <div className="panel-heading">
@@ -381,7 +388,7 @@ function WorkspaceApp() {
                               <th>Chapter</th>
                               <th>Trạng thái xử lý</th>
                               <th>Ngày tải lên</th>
-                              <th><span className="sr-only">Thao tác</span></th>
+                              {!IS_DEMO_MODE && <th><span className="sr-only">Thao tác</span></th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -400,16 +407,18 @@ function WorkspaceApp() {
                                   </span>
                                 </td>
                                 <td>{formatDate(document.uploaded_at)}</td>
-                                <td className="actions">
-                                  <button
-                                    className="danger-button"
-                                    type="button"
-                                    disabled={deletingId === document.document_id}
-                                    onClick={() => void handleDelete(document)}
-                                  >
-                                    {deletingId === document.document_id ? 'Đang xóa...' : 'Xóa'}
-                                  </button>
-                                </td>
+                                {!IS_DEMO_MODE && (
+                                  <td className="actions">
+                                    <button
+                                      className="danger-button"
+                                      type="button"
+                                      disabled={deletingId === document.document_id}
+                                      onClick={() => void handleDelete(document)}
+                                    >
+                                      {deletingId === document.document_id ? 'Đang xóa...' : 'Xóa'}
+                                    </button>
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>

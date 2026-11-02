@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from app.api.upload import get_source_storage
+from app.core.demo_mode import require_mutations_enabled
 from app.core.database import SessionLocal
 from app.repos.subject_repository import SubjectRepository
 from app.schemas.subject import (
@@ -122,6 +123,7 @@ def list_subject_trash(
 )
 def create_subject(
     payload: SubjectCreate,
+    _=Depends(require_mutations_enabled),
     subject_repo=Depends(get_subject_repository),
 ):
     try:
@@ -144,6 +146,7 @@ def create_subject(
 )
 def delete_subject(
     subject_id: str,
+    _=Depends(require_mutations_enabled),
     deletion_service=Depends(
         get_subject_deletion_service
     ),
@@ -173,6 +176,7 @@ def delete_subject(
 )
 def restore_subject(
     subject_id: str,
+    _=Depends(require_mutations_enabled),
     restore_service=Depends(
         get_subject_restore_service
     ),

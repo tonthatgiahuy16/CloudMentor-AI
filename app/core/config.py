@@ -22,7 +22,12 @@ if not DATABASE_URL:
 
 STORAGE_DIR = BASE_DIR / "storage"
 
-UPLOAD_DIR = STORAGE_DIR / "uploads"
+UPLOAD_DIR = Path(
+    os.getenv(
+        "CLOUDMENTOR_UPLOAD_DIR",
+        STORAGE_DIR / "uploads",
+    )
+)
 
 PROCESSED_DIR = STORAGE_DIR / "processed"
 
@@ -32,7 +37,12 @@ TEMP_DIR = STORAGE_DIR / "temp"
 # Vector Database
 # ==========================
 
-CHROMA_DIR = BASE_DIR / "chroma_db"
+CHROMA_DIR = Path(
+    os.getenv(
+        "CHROMA_DIR",
+        BASE_DIR / "chroma_db",
+    )
+)
 
 COLLECTION_NAME = "cloudmentor"
 
@@ -49,6 +59,28 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 TOP_K = 3
 
 SIMILARITY_THRESHOLD = 1.0
+
+# ==========================
+# Public demo controls
+# ==========================
+
+DEMO_MODE = (
+    os.getenv("DEMO_MODE", "false").strip().lower()
+    == "true"
+)
+
+CORS_ALLOWED_ORIGINS = tuple(
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+)
+
+CHAT_RATE_LIMIT_PER_MINUTE = int(
+    os.getenv("CHAT_RATE_LIMIT_PER_MINUTE", "12")
+)
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)

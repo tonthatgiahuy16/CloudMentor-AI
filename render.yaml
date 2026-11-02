@@ -1,0 +1,52 @@
+databases:
+  - name: cloudmentor-demo-db
+    plan: basic-256mb
+    databaseName: cloudmentor
+    user: cloudmentor
+
+services:
+  - type: web
+    name: cloudmentor-demo-api
+    runtime: docker
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /readyz
+    preDeployCommand: alembic upgrade head
+    disk:
+      name: cloudmentor-demo-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cloudmentor-demo-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MODEL_NAME
+        value: gemini-2.5-flash
+      - key: CLOUDMENTOR_SOURCE_STORAGE
+        value: local
+      - key: CLOUDMENTOR_UPLOAD_DIR
+        value: /data/sources
+      - key: CHROMA_DIR
+        value: /data/chroma
+      - key: DEMO_MODE
+        value: "true"
+      - key: CHAT_RATE_LIMIT_PER_MINUTE
+        value: "12"
+      # Set to the final HTTPS origin of the Render Static Site before release.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: cloudmentor-demo-web
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_DEMO_MODE
+        value: "true"
+      # Set to the final HTTPS origin of cloudmentor-demo-api before building.
+      - key: VITE_API_URL
+        sync: false

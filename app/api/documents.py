@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.database import SessionLocal
+from app.core.demo_mode import require_mutations_enabled
 from app.repos.document_repository import DocumentRepository
 from app.services.document_deletion_service import (
     DocumentDeletionService,
@@ -98,6 +99,7 @@ def get_document(
 )
 def delete_document(
     document_id: str,
+    _=Depends(require_mutations_enabled),
     deletion_service=Depends(get_document_deletion_service),
 ):
     try:

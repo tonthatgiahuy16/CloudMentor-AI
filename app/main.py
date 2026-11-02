@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
+from app.api.health import router as health_router
 from app.api.upload import router as upload_router
 from app.api.subjects import router as subjects_router
+from app.core.config import CORS_ALLOWED_ORIGINS
 
 app = FastAPI(
     title="CloudMentor AI",
@@ -13,13 +15,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(CORS_ALLOWED_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type"],
 )
+
+app.include_router(health_router)
 
 app.include_router(
     subjects_router
