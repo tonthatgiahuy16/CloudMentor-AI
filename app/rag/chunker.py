@@ -6,11 +6,16 @@ import uuid
 from app.models.chunk import Chunk
 from app.models.document import Document
 
-CHUNK_ID_SCHEMA_VERSION = "v1"
+CHUNK_ID_SCHEMA_VERSION = "v2"
 
 
 class TextChunker:
-    def __init__(self, chunk_size: int = 800, overlap: int = 150):
+    def __init__(
+        self,
+        chunk_size: int = 800,
+        overlap: int = 150,
+        split_paragraphs: bool = False,
+    ):
         if chunk_size <= 0:
             raise ValueError("chunk_size must be greater than zero")
         if overlap < 0:
@@ -20,6 +25,7 @@ class TextChunker:
 
         self.chunk_size = chunk_size
         self.overlap = overlap
+        self.split_paragraphs = split_paragraphs
 
     def _build_chunk_id(
         self,
@@ -48,6 +54,7 @@ class TextChunker:
             ),
             "chunk_size": self.chunk_size,
             "overlap": self.overlap,
+            "split_paragraphs": self.split_paragraphs,
             "text_sha256": sha256(
                 chunk_text.encode("utf-8")
             ).hexdigest(),
@@ -66,6 +73,34 @@ class TextChunker:
                 canonical_payload,
             )
         )
+
+    def _documents_for_split(
+        self,
+        document: Document,
+    ) -> list[Document]:
+        if (
+            not self.split_paragraphs
+            or document.paragraph_range is None
+        ):
+            return [document]
+
+        paragraph_start, _ = document.paragraph_range
+        return [
+            Document(
+                document_id=document.document_id,
+                subject_id=document.subject_id,
+                source=document.source,
+                text=paragraph,
+                page=document.page,
+                paragraph_range=(
+                    paragraph_start + offset,
+                    paragraph_start + offset,
+                ),
+            )
+            for offset, paragraph in enumerate(
+                document.text.split("\n")
+            )
+        ]
 
     @staticmethod
     def _source_range_for_slice(
@@ -151,79 +186,84 @@ class TextChunker:
                 document
             )
 
-            start = 0
             chunk_index = 0
-
-            while start < len(document.text):
-                end = min(
-                    start + self.chunk_size,
-                    len(document.text),
-                )
-
-                line_range = None
-                paragraph_range = None
-
-                if document.line_range is not None:
-                    line_range = (
-                        self._source_range_for_slice(
-                            text=document.text,
-                            source_range=(
-                                document.line_range
-                            ),
-                            start=start,
-                            end=end,
-                        )
+            for split_document in self._documents_for_split(
+                document
+            ):
+                start = 0
+                while start < len(split_document.text):
+                    end = min(
+                        start + self.chunk_size,
+                        len(split_document.text),
                     )
 
-                elif (
-                    document.paragraph_range
-                    is not None
-                ):
-                    paragraph_range = (
-                        self._source_range_for_slice(
-                            text=document.text,
-                            source_range=(
-                                document.paragraph_range
-                            ),
-                            start=start,
-                            end=end,
+                    line_range = None
+                    paragraph_range = None
+
+                    if split_document.line_range is not None:
+                        line_range = (
+                            self._source_range_for_slice(
+                                text=split_document.text,
+                                source_range=(
+                                    split_document.line_range
+                                ),
+                                start=start,
+                                end=end,
+                            )
                         )
-                    )
 
-                chunk_text = document.text[start:end]
+                    elif (
+                        split_document.paragraph_range
+                        is not None
+                    ):
+                        paragraph_range = (
+                            self._source_range_for_slice(
+                                text=split_document.text,
+                                source_range=(
+                                    split_document.paragraph_range
+                                ),
+                                start=start,
+                                end=end,
+                            )
+                        )
 
-                chunks.append(
-                    Chunk(
-                        subject_id=(
-                            document.subject_id
-                        ),
-                        id=self._build_chunk_id(
-                            document=document,
+                    chunk_text = split_document.text[start:end]
+
+                    chunks.append(
+                        Chunk(
+                            subject_id=(
+                                split_document.subject_id
+                            ),
+                            id=self._build_chunk_id(
+                                document=split_document,
+                                chunk_index=chunk_index,
+                                chunk_text=chunk_text,
+                                line_range=line_range,
+                                paragraph_range=(
+                                    paragraph_range
+                                ),
+                            ),
+                            document_id=(
+                                split_document.document_id
+                            ),
                             chunk_index=chunk_index,
-                            chunk_text=chunk_text,
+                            page=split_document.page,
                             line_range=line_range,
                             paragraph_range=(
                                 paragraph_range
                             ),
-                        ),
-                        document_id=(
-                            document.document_id
-                        ),
-                        chunk_index=chunk_index,
-                        page=document.page,
-                        line_range=line_range,
-                        paragraph_range=(
-                            paragraph_range
-                        ),
-                        source=document.source,
-                        text=chunk_text,
+                            source=split_document.source,
+                            text=chunk_text,
+                        )
                     )
-                )
 
-                if end >= len(document.text):
-                    break
+                    if end >= len(split_document.text):
+                        break
 
-                start += step
-                chunk_index += 1
+                    start += step
+                    chunk_index += 1
+
+                if split_document.text:
+                    chunk_index += 1
 
         return chunks

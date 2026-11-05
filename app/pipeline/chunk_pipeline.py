@@ -5,7 +5,9 @@ class ChunkPipeline:
 
     def __init__(self):
 
-        self.chunker = TextChunker()
+        self.chunker = TextChunker(
+            split_paragraphs=True,
+        )
 
     def run(
         self,

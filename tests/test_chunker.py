@@ -1,6 +1,7 @@
 import pytest
 
 from app.models.document import Document
+from app.pipeline.chunk_pipeline import ChunkPipeline
 from app.rag.chunker import TextChunker
 
 
@@ -17,6 +18,91 @@ def test_chunker_preserves_metadata_and_overlap():
     assert all(chunk.page == 2 for chunk in chunks)
     assert all(chunk.document_id == "doc-1" for chunk in chunks)
     assert all(chunk.subject_id == "subject-1" for chunk in chunks)
+
+
+def test_chunker_keeps_docx_paragraphs_separate_when_strategy_is_enabled():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.docx",
+        text=(
+            "The pipeline reads source documents.\n"
+            "The transform cleans text before chunking.\n"
+            "Each chunk retains a source reference."
+        ),
+        paragraph_range=(1, 3),
+    )
+
+    chunks = TextChunker(
+        chunk_size=800,
+        overlap=150,
+        split_paragraphs=True,
+    ).split([document])
+
+    assert [chunk.text for chunk in chunks] == [
+        "The pipeline reads source documents.",
+        "The transform cleans text before chunking.",
+        "Each chunk retains a source reference.",
+    ]
+    assert [chunk.chunk_index for chunk in chunks] == [0, 1, 2]
+    assert [chunk.paragraph_range for chunk in chunks] == [
+        (1, 1),
+        (2, 2),
+        (3, 3),
+    ]
+
+
+def test_chunk_pipeline_enables_paragraph_strategy_for_docx_documents():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.docx",
+        text="first\nsecond\nthird",
+        paragraph_range=(1, 3),
+    )
+
+    chunks = ChunkPipeline().run([document])
+
+    assert [chunk.text for chunk in chunks] == [
+        "first",
+        "second",
+        "third",
+    ]
+    assert [chunk.paragraph_range for chunk in chunks] == [
+        (1, 1),
+        (2, 2),
+        (3, 3),
+    ]
+
+
+def test_paragraph_strategy_splits_long_paragraph_without_crossing_boundary():
+    document = Document(
+        document_id="document-1",
+        subject_id="subject-1",
+        source="lesson.docx",
+        text="abcdefghij\nxy",
+        paragraph_range=(1, 2),
+    )
+
+    chunks = TextChunker(
+        chunk_size=5,
+        overlap=1,
+        split_paragraphs=True,
+    ).split([document])
+
+    assert [chunk.text for chunk in chunks] == [
+        "abcde",
+        "efghi",
+        "ij",
+        "xy",
+    ]
+    assert [chunk.chunk_index for chunk in chunks] == [0, 1, 2, 3]
+    assert [chunk.paragraph_range for chunk in chunks] == [
+        (1, 1),
+        (1, 1),
+        (1, 1),
+        (2, 2),
+    ]
 
 
 def test_chunk_ids_are_deterministic_for_same_input():
