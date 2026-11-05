@@ -1,11 +1,19 @@
-from fastapi import FastAPI
+import pytest
+
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
 from app.api.chat import (
+    chat,
     get_chat_service,
     get_chat_subject_repository,
     router,
 )
+from app.llm.exceptions import (
+    LLMProviderError,
+    LLMProviderUnavailableError,
+)
+from app.schemas.chat import ChatRequest
 
 
 class FakeChatService:
@@ -243,3 +251,43 @@ def test_chat_rejects_missing_subject_before_retrieval():
         "detail": "Subject not found"
     }
     assert service.calls == []
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status"),
+    [
+        (LLMProviderUnavailableError(), 503),
+        (LLMProviderError(), 502),
+    ],
+)
+def test_chat_translates_controlled_provider_errors(
+    error,
+    expected_status,
+):
+    class FailingChatService:
+        def ask(self, *_args, **_kwargs):
+            raise error
+
+    with pytest.raises(HTTPException) as exc_info:
+        chat(
+            request=ChatRequest(
+                question="Cloud là gì?",
+                subject_id="subject-1",
+            ),
+            http_request=SimpleNamespace(
+                headers={},
+                client=SimpleNamespace(host="test-client"),
+            ),
+            chat_service=FailingChatService(),
+            subject_repo=FakeSubjectRepository(
+                SimpleNamespace(
+                    subject_id="subject-1",
+                    status="ACTIVE",
+                )
+            ),
+        )
+
+    assert exc_info.value.status_code == expected_status
+    assert exc_info.value.detail == (
+        "LLM provider request failed"
+    )
