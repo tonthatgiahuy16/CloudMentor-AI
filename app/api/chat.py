@@ -6,6 +6,10 @@ from fastapi import (
     status,
 )
 from app.core.rate_limit import enforce_chat_rate_limit
+from app.llm.exceptions import (
+    LLMProviderError,
+    LLMProviderUnavailableError,
+)
 from app.schemas.chat import ChatRequest, ChatResponse
 
 from functools import lru_cache
@@ -67,7 +71,18 @@ def chat(
             detail="Subject is not active",
         )
 
-    return chat_service.ask(
-        request.question,
-        subject_id=request.subject_id,
-    )
+    try:
+        return chat_service.ask(
+            request.question,
+            subject_id=request.subject_id,
+        )
+    except LLMProviderUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LLM provider request failed",
+        ) from exc
+    except LLMProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="LLM provider request failed",
+        ) from exc
