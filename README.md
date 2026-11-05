@@ -49,7 +49,8 @@ The optional Render configuration remains a costed deployment path. It is not ac
 - Page-, line-, paragraph-, document-, chunk-, and subject-level metadata propagated through ingestion and retrieval.
 - PostgreSQL lifecycle records linked to Chroma entries through `document_id`.
 - Subject-scoped retrieval to keep queries inside the selected knowledge domain.
-- Context-based LLM answers with format-aware source references; a narrow four-case retrieval and answer-level evaluation baseline checks expected citation coverage automatically and records human-reviewed correctness, faithfulness, and refusal behavior. Broader retrieval relevance and answer quality remain unbenchmarked.
+- Context-based LLM answers with format-aware source references; a versioned 14-case multi-format retrieval benchmark covers expected evidence, bilingual lineage queries, anchor queries, distractors, and unanswerable questions. Answer correctness, faithfulness, and refusal are scored from human-reviewed labels.
+- Bounded Gemini retry for `429`, `503`, and timeout failures, with controlled `502`/`503` API responses instead of leaking provider exceptions.
 - Database-enforced duplicate protection for concurrent ingestion, failed-document retry, stale-ingestion recovery, and subject trash/restore workflows.
 - A dry-run-first PostgreSQL-Chroma reconciliation workflow with bounded, logged repair for orphan vectors and indexed documents missing all vectors.
 - An injectable source-storage boundary with local-filesystem and MinIO implementations for canonical source writes, reads, retries, and rebuilds.
@@ -65,11 +66,11 @@ The optional Render configuration remains a costed deployment path. It is not ac
 | --- | --- | --- |
 | API | FastAPI | Upload, document, subject, and chat endpoints |
 | Relational storage | PostgreSQL + SQLAlchemy | Document metadata and lifecycle state |
-| Source extraction | PyMuPDF, UTF-8 text loading, python-docx | PDF pages, TXT lines, and DOCX body paragraphs |
+| Source extraction | pypdf, UTF-8 text loading, python-docx | PDF pages, TXT lines, and DOCX body paragraphs |
 | Source files | Local filesystem or MinIO through a shared storage contract | Canonical source retention for retry and rebuild |
 | Embeddings | BGE-M3 | Document and query vector generation |
 | Vector index | Chroma | Similarity search over derived chunk embeddings |
-| Generation | Gemini | Answer generation from retrieved context |
+| Generation | Gemini | Answer generation from retrieved context with bounded retry for transient provider failures |
 | Frontend | React + TypeScript + Vite | Document library, upload, subject management, and chat |
 | Quality checks | Pytest, ESLint, TypeScript, GitHub Actions | Regression and build validation |
 
@@ -84,7 +85,7 @@ PDF, UTF-8 TXT, or body-paragraph DOCX upload
     -> mark PROCESSING
     -> extract text by page, line, or paragraph
     -> normalize text without losing source boundaries
-    -> create overlapping chunks with lineage metadata
+    -> create lineage-preserving chunks; DOCX keeps paragraph boundaries while long units can still be split
     -> generate embeddings
     -> write derived vectors and metadata to Chroma
     -> mark INDEXED
@@ -96,6 +97,8 @@ Question + required subject_id
     -> embed question
     -> retrieve matching chunks filtered by subject
     -> generate an answer constrained by retrieved context
+    -> retry transient Gemini `429`, `503`, or timeout failures with exponential backoff
+    -> return controlled `502` or `503` when the provider cannot complete the request
     -> return answer plus document and format-aware location references
 
 Subject moved to Trash
@@ -185,7 +188,7 @@ The ingestion path carries metadata needed to trace a retrieval result back to t
 - `chunk_index`
 - vector distance
 
-The chat API returns document and format-aware location references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. A narrow four-case retrieval and answer-level evaluation baseline now checks expected citation coverage automatically and records human-reviewed correctness, faithfulness, and refusal behavior; broader quality still requires a larger benchmark.
+The chat API returns document and format-aware location references alongside the answer. These references improve inspectability, but they do not by themselves prove answer grounding. The 14-case retrieval benchmark checks expected evidence automatically; answer correctness, faithfulness, and refusal behavior are scored from human-reviewed labels. Broader answer quality still requires more reviewed cases.
 
 ## API surface
 
@@ -283,6 +286,8 @@ python -m uvicorn app.main:app --reload
 
 Do not commit `.env`, API keys, passwords, or connection strings.
 
+`LLM_MAX_ATTEMPTS` (default `3`) and `LLM_RETRY_BACKOFF_SECONDS` (default `1`) control bounded retry for Gemini `429`, `503`, and timeout failures. They do not add a circuit breaker, provider fallback, or batch-evaluation checkpoint.
+
 ### Source storage
 
 `CLOUDMENTOR_SOURCE_STORAGE` selects the source adapter. The default is `local`, using `CLOUDMENTOR_UPLOAD_DIR`. Set it to `minio` only after a MinIO server and bucket already exist, then provide the endpoint, access key, secret key, bucket, and secure-transport flag shown in `.env.example`.
@@ -353,9 +358,10 @@ Adjust the PostgreSQL version in the path for the local installation. This is a 
 Run backend tests from the repository root:
 
 ```powershell
-python -m pytest -q -p no:cacheprovider --basetemp .codex_pytest_tmp
-Remove-Item .codex_pytest_tmp -Recurse -Force
+python -m pytest -q --basetemp .pytest-tmp-full
 ```
+
+`--basetemp` keeps pytest fixtures out of the Windows `%TEMP%` directory when that directory is restricted. The temporary directory is Git-ignored.
 
 Run frontend checks from `frontend/`:
 
@@ -387,12 +393,13 @@ The script contains project-specific mappings. Review the mapping, back up the C
 - Stale-ingestion recovery, legacy-source repair, and unresolved reconciliation drift still require operator action. Legacy documents without retained-source metadata require the correct original source file.
 - PostgreSQL-Chroma reconciliation repair is intentionally bounded: only orphan chunks and `INDEXED` documents with no chunks are eligible; missing lineage, known non-expected documents, and subject mismatches remain report-only.
 - A local Phase 2.5 reliability evidence run exercised ingestion, validation, duplicate protection, retry, Trash and Restore, reconciliation, controlled repair, and stale recovery. Its F02 drift was snapshotted and remediated locally, and a failure-path cleanup guard was added. Its F01 finding was remediated with deterministic UUID v5 chunk IDs and a separate isolated Trash and Restore run that preserved chunk IDs, document IDs, and format-aware lineage. Future report-only drift remains manual and must follow the documented snapshot, review, manifest, and verification procedure. See [`docs/RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md`](docs/RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md) and [`docs/PHASE2_RELIABILITY_REPORT.md`](docs/PHASE2_RELIABILITY_REPORT.md).
-- TXT ingestion is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
-- A narrow four-case retrieval and answer-level evaluation baseline exists across TXT, DOCX, and PDF. Citation coverage is checked automatically, while correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality remain unbenchmarked.
+- TXT ingestion is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted. DOCX documents indexed before the paragraph-boundary strategy need a rebuild to receive its new chunk layout and `chunk_id` schema.
+- A 14-case retrieval benchmark exists across TXT, DOCX, and PDF, including distractors, bilingual lineage queries, anchor queries, and unanswerable questions. Expected evidence is scored automatically, while answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality remain unbenchmarked.
 - Integration tests do not yet cover live PostgreSQL, Chroma, embedding, and Gemini boundaries as one workflow.
 - Structured operational logging, metrics, tracing, and alerting are incomplete.
-- Authentication, authorization, rate limiting, and production deployment are not implemented.
-- Dedicated health and readiness checks are not implemented.
+- Authentication and authorization are not implemented. Chat rate limiting is process-local and therefore not sufficient for horizontally scaled deployment; active production deployment is not established.
+- `/healthz` and dependency-checking `/readyz` exist, but they are not evidence of production monitoring or alerting.
+- Gemini retry is bounded to `429`, `503`, and timeout failures. There is no circuit breaker, provider fallback, or persisted checkpoint/cache for batch evaluation.
 
 ## Engineering principles
 
