@@ -46,4 +46,6 @@ python_files = [
   "test_public_demo_controls.py",
   "test_demo_seed_api.py",
   "test_demo_seed_service.py",
+  "test_live_retrieval.py",
+  "test_chunking_ablation.py",
 ]

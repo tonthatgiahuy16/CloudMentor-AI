@@ -59,6 +59,15 @@ def test_rejects_unknown_evidence_source(valid_dataset, tmp_path):
         validate_dataset(dataset, tmp_path)
 
 
+def test_rejects_incomplete_cross_lingual_pair(valid_dataset, tmp_path):
+    dataset = deepcopy(valid_dataset)
+    dataset["cases"][0]["fact_id"] = "shared-fact"
+    dataset["cases"][0]["query_language"] = "en"
+
+    with pytest.raises(ValueError, match="incomplete language pair"):
+        validate_dataset(dataset, tmp_path)
+
+
 def test_rejects_evidence_outside_source(valid_dataset, tmp_path):
     dataset = deepcopy(valid_dataset)
     dataset["cases"][0]["expected_evidence"][0]["line_range"] = [3, 3]

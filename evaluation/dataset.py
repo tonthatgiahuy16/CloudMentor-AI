@@ -46,6 +46,7 @@ def validate_dataset(dataset: dict, dataset_dir: Path) -> None:
             )
 
     case_ids = set()
+    paired_fact_languages = {}
     known_subjects = {
         source["subject_key"]
         for source in sources_by_id.values()
@@ -58,6 +59,20 @@ def validate_dataset(dataset: dict, dataset_dir: Path) -> None:
             raise ValueError(f"duplicate case_id: {case_id}")
 
         case_ids.add(case_id)
+
+        fact_id = case.get("fact_id")
+        query_language = case.get("query_language")
+        if (fact_id is None) != (query_language is None):
+            raise ValueError(f"incomplete cross-lingual metadata: {case_id}")
+        if fact_id is not None:
+            if not isinstance(fact_id, str) or not fact_id:
+                raise ValueError(f"invalid fact_id: {case_id}")
+            if query_language not in {"en", "vi"}:
+                raise ValueError(f"invalid query_language: {case_id}")
+            languages = paired_fact_languages.setdefault(fact_id, set())
+            if query_language in languages:
+                raise ValueError(f"duplicate fact language: {fact_id}")
+            languages.add(query_language)
 
         if case["subject_key"] not in known_subjects:
             raise ValueError(f"unknown subject_key: {case_id}")
@@ -119,3 +134,7 @@ def validate_dataset(dataset: dict, dataset_dir: Path) -> None:
 
             if not 1 <= start <= end <= location_counts[source_id]:
                 raise ValueError(f"{location_key} out of bounds: {case_id}")
+
+    for fact_id, languages in paired_fact_languages.items():
+        if languages != {"en", "vi"}:
+            raise ValueError(f"incomplete language pair: {fact_id}")
