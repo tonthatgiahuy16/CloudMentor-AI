@@ -1,4 +1,5 @@
 import type {
+  ActivatePolicyVersionInput,
   DeleteDocumentResult,
   DocumentRecord,
   UploadDocumentInput,
@@ -13,6 +14,18 @@ import type {
 } from '../types/subject'
 
 import type { ChatResponse } from '../types/chat'
+import type {
+  AttemptAnswerSubmitInput,
+  AttemptResult,
+  AttemptStartResponse,
+  QuizCreateResponse,
+  QuizOverview,
+  QuizPublic,
+  QuizPublishResponse,
+  QuizQuestionCreateInput,
+  QuizQuestionPublic,
+  QuizSummary,
+} from '../types/quiz'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -56,10 +69,10 @@ async function getErrorMessage(
         : undefined
 
     if (documentStatus === 'INDEXED') {
-      return 'Tài liệu này đã được tải lên và lập chỉ mục'
+      return 'Văn bản chính sách này đã được tải lên và lập chỉ mục'
     }
 
-    return 'Tài liệu này đã được tải lên trước đó'
+    return 'Văn bản chính sách này đã được tải lên trước đó'
   } catch {
     return fallback
   }
@@ -74,7 +87,36 @@ export async function getDocuments(): Promise<DocumentRecord[]> {
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể tải danh sách tài liệu',
+        'Không thể tải danh sách văn bản chính sách',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function activatePolicyVersion(
+  input: ActivatePolicyVersionInput,
+): Promise<DocumentRecord> {
+  const response = await fetch(
+    `${API_BASE_URL}/documents/${encodeURIComponent(input.documentId)}/activate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        effective_from: input.effectiveFrom,
+        supersedes_document_id: input.supersedesDocumentId || null,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể kích hoạt phiên bản chính sách',
       ),
     )
   }
@@ -91,7 +133,7 @@ export async function getSubjects(): Promise<SubjectRecord[]> {
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể tải danh sách môn học',
+        'Không thể tải danh sách chuyên mục onboarding',
       ),
     )
   }
@@ -110,14 +152,13 @@ export async function getSubjectTrash(): Promise<
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể tải danh sách môn học đã xóa',
+        'Không thể tải danh sách chuyên mục đã lưu trữ',
       ),
     )
   }
 
   return response.json()
 }
-
 
 export async function createSubject(
   name: string,
@@ -137,14 +178,13 @@ export async function createSubject(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể tạo môn học',
+        'Không thể tạo chuyên mục onboarding',
       ),
     )
   }
 
   return response.json()
 }
-
 
 export async function deleteSubject(
   subjectId: string,
@@ -160,14 +200,13 @@ export async function deleteSubject(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể xóa môn học',
+        'Không thể lưu trữ chuyên mục onboarding',
       ),
     )
   }
 
   return response.json()
 }
-
 
 export async function restoreSubject(
   subjectId: string,
@@ -183,14 +222,13 @@ export async function restoreSubject(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể phục hồi môn học',
+        'Không thể khôi phục chuyên mục onboarding',
       ),
     )
   }
 
   return response.json()
 }
-
 
 export async function uploadDocument(
   input: UploadDocumentInput,
@@ -216,12 +254,26 @@ export async function uploadDocument(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể tải tài liệu lên',
+        'Không thể tải văn bản chính sách lên',
       ),
     )
   }
 
-  return response.json()
+  const result: UploadDocumentResult = await response.json()
+
+  if (input.activateImmediately && input.effectiveDate) {
+    try {
+      await activatePolicyVersion({
+        documentId: result.document_id,
+        effectiveFrom: input.effectiveDate,
+        supersedesDocumentId: input.supersedesDocumentId ?? null,
+      })
+    } catch {
+      // If activation fails, document remains INDEXED and can be activated from the table
+    }
+  }
+
+  return result
 }
 
 export async function deleteDocument(
@@ -238,13 +290,12 @@ export async function deleteDocument(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể xóa tài liệu',
+        'Không thể xóa văn bản chính sách',
       ),
     )
   }
 
   return response.json()
-
 }
 
 export async function askQuestion(
@@ -269,7 +320,218 @@ export async function askQuestion(
     throw new Error(
       await getErrorMessage(
         response,
-        'Không thể nhận câu trả lời',
+        'Không thể nhận câu trả lời từ kho chính sách',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function getPublishedQuizzes(
+  subjectId: string,
+): Promise<QuizSummary[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/?subject_id=${encodeURIComponent(subjectId)}`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tải danh sách đề kiểm tra onboarding',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function getPublishedQuizDetail(
+  quizId: string,
+): Promise<QuizPublic> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tải nội dung bài kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function createDraftQuiz(
+  subjectId: string,
+  title: string,
+): Promise<QuizCreateResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        subject_id: subjectId,
+        title,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể khởi tạo đề kiểm tra nháp',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function addQuestionToQuiz(
+  quizId: string,
+  payload: QuizQuestionCreateInput,
+): Promise<QuizQuestionPublic> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/questions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể thêm câu hỏi vào đề kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function publishDraftQuiz(
+  quizId: string,
+): Promise<QuizPublishResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/publish`,
+    {
+      method: 'POST',
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể phê duyệt và xuất bản đề kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function startQuizAttempt(
+  quizId: string,
+  employeeId: string,
+): Promise<AttemptStartResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/attempts`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        employee_id: employeeId,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể bắt đầu lượt làm bài kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function submitQuizAttempt(
+  attemptId: string,
+  answers: AttemptAnswerSubmitInput[],
+): Promise<AttemptResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/attempts/${encodeURIComponent(attemptId)}/submit`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ answers }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể nộp và chấm điểm bài kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function getQuizOverview(
+  quizId: string,
+): Promise<QuizOverview> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/overview`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tải thống kê tổng quan của đề kiểm tra',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function getQuizAttemptResults(
+  quizId: string,
+): Promise<AttemptResult[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/attempts`,
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'Không thể tải lịch sử lượt làm bài từ máy chủ',
       ),
     )
   }

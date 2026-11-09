@@ -22,26 +22,26 @@ interface PendingAction {
 }
 
 const STATUS_LABELS: Record<SubjectTrashStatus, string> = {
-  DELETING: 'Đang chuyển',
-  DELETED: 'Trong thùng rác',
-  DELETE_FAILED: 'Xóa thất bại',
-  RESTORING: 'Đang khôi phục',
+  DELETING: 'Đang thu hồi',
+  DELETED: 'Đã lưu trữ',
+  DELETE_FAILED: 'Thu hồi thất bại',
+  RESTORING: 'Đang tái tạo chỉ mục',
   RESTORE_FAILED: 'Khôi phục thất bại',
 }
 
 const LIFECYCLE_ERROR_MESSAGES: Record<string, string> = {
   'Subject deletion failed':
-    'Không thể đưa môn học vào thùng rác. Xem chi tiết bên dưới.',
+    'Không thể đưa chuyên mục vào lưu trữ. Xem chi tiết bên dưới.',
   'Subject restoration failed':
-    'Không thể khôi phục môn học. Xem chi tiết bên dưới.',
+    'Không thể khôi phục chuyên mục. Xem chi tiết bên dưới.',
   'Document source metadata is incomplete':
-    'Metadata nguồn của tài liệu chưa đầy đủ nên chưa thể tái tạo chỉ mục.',
+    'Metadata nguồn của văn bản chưa đầy đủ nên chưa thể tái tạo chỉ mục.',
   'Retained source file is missing':
-    'Không tìm thấy file nguồn đã lưu để khôi phục tài liệu.',
+    'Không tìm thấy tệp gốc chuẩn đã lưu để khôi phục văn bản.',
   'Retained source file size does not match':
-    'Kích thước file nguồn không khớp với metadata đã lưu.',
+    'Kích thước tệp gốc không khớp với metadata đã đăng ký.',
   'Retained source checksum does not match':
-    'Checksum của file nguồn không khớp với metadata đã lưu.',
+    'Mã băm SHA-256 của tệp gốc không khớp với metadata đã lưu.',
 }
 
 function formatLifecycleError(value: string): string {
@@ -104,7 +104,7 @@ function SubjectLifecyclePanel({
           setError(
             requestError instanceof Error
               ? requestError.message
-              : 'Không thể tải dữ liệu môn học',
+              : 'Không thể tải dữ liệu chuyên mục chính sách',
           )
         }
       } finally {
@@ -130,9 +130,9 @@ function SubjectLifecyclePanel({
 
   async function handleDelete(subject: SubjectRecord) {
     const confirmed = window.confirm(
-      `Đưa môn học "${subject.name}" vào thùng rác?\n\n`
-      + 'Tài liệu sẽ bị ẩn khỏi tìm kiếm nhưng nguồn dữ liệu '
-      + 'vẫn được giữ để có thể khôi phục.',
+      `Thu hồi chuyên mục "${subject.name}" khỏi phạm vi tra cứu?\n\n`
+      + 'Chỉ mục Chroma sẽ được gỡ bỏ để nhân viên không tra cứu nhầm, '
+      + 'nhưng tệp gốc chuẩn và bản ghi PostgreSQL vẫn được bảo toàn để tái tạo.',
     )
 
     if (!confirmed || pendingAction) return
@@ -149,15 +149,15 @@ function SubjectLifecyclePanel({
 
       await reloadAfterAction()
       setSuccess(
-        `Đã đưa ${subject.name} vào thùng rác. `
-        + `${result.processed_documents} tài liệu và `
-        + `${result.deleted_chunks} đoạn dữ liệu đã được xử lý.`,
+        `Đã thu hồi chuyên mục ${subject.name}. `
+        + `${result.processed_documents} văn bản và `
+        + `${result.deleted_chunks} vector dẫn xuất đã được gỡ khỏi Chroma.`,
       )
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? formatLifecycleError(requestError.message)
-          : 'Không thể đưa môn học vào thùng rác',
+          : 'Không thể thu hồi chuyên mục chính sách',
       )
 
       try {
@@ -185,15 +185,15 @@ function SubjectLifecyclePanel({
 
       await reloadAfterAction()
       setSuccess(
-        `Đã khôi phục ${subject.name}. `
-        + `${result.processed_documents} tài liệu và `
-        + `${result.indexed_chunks} đoạn dữ liệu đã được lập chỉ mục lại.`,
+        `Đã khôi phục chuyên mục ${subject.name} từ tệp gốc chuẩn. `
+        + `${result.processed_documents} văn bản và `
+        + `${result.indexed_chunks} đoạn trích dẫn đã được tái lập chỉ mục.`,
       )
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? formatLifecycleError(requestError.message)
-          : 'Không thể khôi phục môn học',
+          : 'Không thể khôi phục chuyên mục chính sách',
       )
 
       try {
@@ -218,7 +218,7 @@ function SubjectLifecyclePanel({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : 'Không thể tải lại dữ liệu môn học',
+          : 'Không thể tải lại dữ liệu chuyên mục',
       )
     } finally {
       setIsLoading(false)
@@ -228,20 +228,20 @@ function SubjectLifecyclePanel({
   return (
     <section
       className="subject-lifecycle"
-      aria-label="Quản lý môn học"
+      aria-label="Quản lý vòng đời chuyên mục chính sách"
       aria-busy={pendingAction !== null}
     >
       <div className="subject-overview">
         <article className="subject-overview-card">
-          <span>Đang hoạt động</span>
+          <span>Chuyên mục đang áp dụng</span>
           <strong>{activeSubjects.length}</strong>
-          <p>Có thể tải tài liệu và truy vấn.</p>
+          <p>Đang mở cho nhân viên tra cứu và làm bài onboarding.</p>
         </article>
 
         <article className="subject-overview-card trash-summary">
-          <span>Trong thùng rác</span>
+          <span>Đã thu hồi / Lưu trữ</span>
           <strong>{trashSubjects.length}</strong>
-          <p>Nguồn được giữ để khôi phục.</p>
+          <p>Đã gỡ vector Chroma, giữ tệp gốc chuẩn để tái tạo.</p>
         </article>
 
         <button
@@ -250,7 +250,7 @@ function SubjectLifecyclePanel({
           onClick={() => void handleRefresh()}
           disabled={isLoading || pendingAction !== null}
         >
-          {isLoading ? 'Đang tải...' : 'Tải lại dữ liệu'}
+          {isLoading ? 'Đang tải...' : 'Đồng bộ trạng thái'}
         </button>
       </div>
 
@@ -270,18 +270,18 @@ function SubjectLifecyclePanel({
         <section className="subject-column">
           <div className="subject-column-heading">
             <div>
-              <span className="subject-column-kicker">Đang dùng</span>
-              <h2>Môn học đang hoạt động</h2>
+              <span className="subject-column-kicker">Phạm vi hiện hành</span>
+              <h2>Chuyên mục đang hoạt động</h2>
             </div>
             <span className="subject-count">{activeSubjects.length}</span>
           </div>
 
           {isLoading ? (
-            <p className="subject-empty">Đang tải môn học...</p>
+            <p className="subject-empty">Đang tải chuyên mục...</p>
           ) : activeSubjects.length === 0 ? (
             <div className="subject-empty">
-              <strong>Chưa có môn học hoạt động</strong>
-              <span>Tạo môn học ở trang Tài liệu để bắt đầu.</span>
+              <strong>Chưa có chuyên mục hoạt động</strong>
+              <span>Tạo chuyên mục mới ở tab Văn bản chính sách để bắt đầu.</span>
             </div>
           ) : (
             <ul className="subject-list">
@@ -298,7 +298,7 @@ function SubjectLifecyclePanel({
                       </span>
                       <div>
                         <strong>{subject.name}</strong>
-                        <span>Sẵn sàng sử dụng</span>
+                        <span>Đang mở tra cứu chính sách</span>
                       </div>
                     </div>
 
@@ -308,7 +308,7 @@ function SubjectLifecyclePanel({
                       onClick={() => void handleDelete(subject)}
                       disabled={pendingAction !== null}
                     >
-                      {isDeleting ? 'Đang chuyển...' : 'Đưa vào thùng rác'}
+                      {isDeleting ? 'Đang thu hồi...' : 'Thu hồi chỉ mục'}
                     </button>
                   </li>
                 )
@@ -320,18 +320,18 @@ function SubjectLifecyclePanel({
         <section className="subject-column subject-trash-column">
           <div className="subject-column-heading">
             <div>
-              <span className="subject-column-kicker">Có thể khôi phục</span>
-              <h2>Thùng rác</h2>
+              <span className="subject-column-kicker">Tái tạo từ Source Storage</span>
+              <h2>Chuyên mục đã lưu trữ</h2>
             </div>
             <span className="subject-count">{trashSubjects.length}</span>
           </div>
 
           {isLoading ? (
-            <p className="subject-empty">Đang tải thùng rác...</p>
+            <p className="subject-empty">Đang tải danh sách lưu trữ...</p>
           ) : trashSubjects.length === 0 ? (
             <div className="subject-empty">
-              <strong>Thùng rác đang trống</strong>
-              <span>Các môn học có thể khôi phục sẽ xuất hiện tại đây.</span>
+              <strong>Không có chuyên mục nào trong kho lưu trữ</strong>
+              <span>Các chuyên mục bị thu hồi chỉ mục sẽ xuất hiện tại đây để tái tạo khi cần.</span>
             </div>
           ) : (
             <ul className="subject-list">
@@ -375,7 +375,7 @@ function SubjectLifecyclePanel({
                       onClick={() => void handleRestore(subject)}
                       disabled={pendingAction !== null || isTransitioning}
                     >
-                      {isRestoring ? 'Đang khôi phục...' : 'Khôi phục'}
+                      {isRestoring ? 'Đang tái lập chỉ mục...' : 'Tái tạo chỉ mục Chroma'}
                     </button>
                   </li>
                 )

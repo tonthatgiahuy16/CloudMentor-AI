@@ -8,6 +8,8 @@ import {
   createSubject,
   uploadDocument,
 } from '../services/api'
+import { isDocumentApplicableNow } from '../services/onboardingStore'
+import type { DocumentRecord } from '../types/document'
 import type { SubjectRecord } from '../types/subject'
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -42,6 +44,7 @@ function isSupportedDocument(
 interface UploadPanelProps {
   subjects: SubjectRecord[]
   subjectId: string
+  documents?: DocumentRecord[]
   onSubjectChange: (subjectId: string) => void
   onSubjectCreated: (subject: SubjectRecord) => void
   onUploaded: () => Promise<void>
@@ -50,20 +53,29 @@ interface UploadPanelProps {
 function UploadPanel({
   subjects,
   subjectId,
+  documents = [],
   onSubjectChange,
   onSubjectCreated,
   onUploaded,
 }: UploadPanelProps) {
   const formRef = useRef<HTMLFormElement>(null)
+  const todayIso = new Intl.DateTimeFormat('en-CA').format(new Date())
 
   const [newSubjectName, setNewSubjectName] = useState('')
   const [chapter, setChapter] = useState('')
+  const [effectiveDate, setEffectiveDate] = useState(todayIso)
+  const [supersedesId, setSupersedesId] = useState('')
+  const [activateOnUpload, setActivateOnUpload] = useState(true)
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isCreatingSubject, setIsCreatingSubject] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const activeSubjectDocs = documents.filter((d) =>
+    isDocumentApplicableNow(d),
+  )
 
   async function handleCreateSubject(
     event: FormEvent<HTMLFormElement>,
@@ -82,18 +94,17 @@ function UploadPanel({
 
       onSubjectCreated(created)
       setNewSubjectName('')
-      setSuccess(`Đã thêm môn học ${created.name}`)
+      setSuccess(`Đã tạo chuyên mục chính sách "${created.name}"`)
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : 'Không thể tạo môn học',
+          : 'Không thể tạo chuyên mục onboarding',
       )
     } finally {
       setIsCreatingSubject(false)
     }
   }
-
 
   function handleSelectedFile(
     nextFile: File | null,
@@ -109,7 +120,7 @@ function UploadPanel({
     if (!isSupportedDocument(nextFile.name)) {
       setFile(null)
       setError(
-        'Chỉ hỗ trợ file PDF, TXT hoặc DOCX',
+        'Chỉ hỗ trợ văn bản PDF, TXT (UTF-8) hoặc DOCX',
       )
       return
     }
@@ -117,14 +128,13 @@ function UploadPanel({
     if (nextFile.size > MAX_UPLOAD_BYTES) {
       setFile(null)
       setError(
-        'Tài liệu không được vượt quá 10 MB',
+        'Văn bản không được vượt quá 10 MB',
       )
       return
     }
 
     setFile(nextFile)
   }
-
 
   function handleDragOver(
     event: DragEvent<HTMLLabelElement>,
@@ -134,14 +144,12 @@ function UploadPanel({
     setIsDragging(true)
   }
 
-
   function handleDragLeave(
     event: DragEvent<HTMLLabelElement>,
   ) {
     event.preventDefault()
     setIsDragging(false)
   }
-
 
   function handleDrop(
     event: DragEvent<HTMLLabelElement>,
@@ -154,7 +162,7 @@ function UploadPanel({
     if (droppedFiles.length !== 1) {
       setFile(null)
       setError(
-        'Chỉ được tải một tài liệu mỗi lần',
+        'Chỉ được tải một văn bản mỗi lần',
       )
       setSuccess(null)
       return
@@ -165,7 +173,6 @@ function UploadPanel({
     )
   }
 
-
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -174,26 +181,26 @@ function UploadPanel({
     setSuccess(null)
 
     if (!file) {
-      setError('Hãy chọn một tài liệu')
+      setError('Hãy chọn một văn bản chính sách')
       return
     }
 
     if (!isSupportedDocument(file.name)) {
       setError(
-        'Chỉ hỗ trợ file PDF, TXT hoặc DOCX',
+        'Chỉ hỗ trợ văn bản PDF, TXT hoặc DOCX',
       )
       return
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
       setError(
-        'Tài liệu không được vượt quá 10 MB',
+        'Văn bản không được vượt quá 10 MB',
       )
       return
     }
 
     if (!subjectId) {
-      setError('Hãy chọn môn học')
+      setError('Hãy chọn chuyên mục onboarding')
       return
     }
 
@@ -206,7 +213,7 @@ function UploadPanel({
         !Number.isInteger(chapterNumber)
         || chapterNumber < 1
       ) {
-        setError('Chapter phải là số nguyên lớn hơn 0')
+        setError('Số phiên bản phải là số nguyên lớn hơn 0')
         return
       }
     }
@@ -218,13 +225,19 @@ function UploadPanel({
         file,
         subjectId,
         chapter: chapterNumber,
+        effectiveDate: effectiveDate || todayIso,
+        supersedesDocumentId: supersedesId || null,
+        activateImmediately: activateOnUpload,
       })
 
       setSuccess(
-        `Đã xử lý ${result.filename} thành ${result.chunks} đoạn dữ liệu`,
+        activateOnUpload
+          ? `Đã lập chỉ mục và kích hoạt hiệu lực cho ${result.filename} (${result.chunks} đoạn dữ liệu)`
+          : `Đã lập chỉ mục ${result.filename} (${result.chunks} đoạn dữ liệu) ở trạng thái chờ kích hoạt`,
       )
       setFile(null)
       setChapter('')
+      setSupersedesId('')
       formRef.current?.reset()
 
       await onUploaded()
@@ -232,7 +245,7 @@ function UploadPanel({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : 'Không thể tải tài liệu lên',
+          : 'Không thể tải văn bản chính sách lên',
       )
     } finally {
       setIsUploading(false)
@@ -243,11 +256,11 @@ function UploadPanel({
     <section className="upload-panel">
       <div className="upload-heading">
         <div>
-          <span className="eyebrow">Nạp dữ liệu</span>
-          <h2>Tải tài liệu mới</h2>
+          <span className="eyebrow">Quản trị văn bản & phiên bản</span>
+          <h2>Nạp tài liệu Onboarding</h2>
           <p>
-            PDF, TXT và DOCX sẽ được xử lý, chia đoạn dữ liệu
-            và lập chỉ mục tìm kiếm.
+            Văn bản gốc (PDF, TXT, DOCX) được lưu trữ chuẩn hóa, lập chỉ mục Chroma
+            và xác thực số lượng đoạn trước khi kích hoạt hiệu lực trong PostgreSQL.
           </p>
         </div>
         <span className="upload-limit">
@@ -257,21 +270,21 @@ function UploadPanel({
 
       <div className="ingestion-context">
         <div>
-          <span>Đích nạp dữ liệu</span>
+          <span>Chuyên mục chính sách đích</span>
           <strong>
             {subjects.find((subject) => subject.subject_id === subjectId)?.name
-              ?? 'Chưa chọn môn học'}
+              ?? 'Chưa chọn chuyên mục'}
           </strong>
         </div>
         <label className="form-field compact-subject-field">
-          <span>Đổi môn học</span>
+          <span>Đổi chuyên mục</span>
           <select
             value={subjectId}
             onChange={(event) => onSubjectChange(event.target.value)}
             disabled={subjects.length === 0}
           >
             {subjects.length === 0 ? (
-              <option value="">Chưa có môn học</option>
+              <option value="">Chưa có chuyên mục</option>
             ) : subjects.map((subject) => (
               <option key={subject.subject_id} value={subject.subject_id}>
                 {subject.name}
@@ -286,12 +299,12 @@ function UploadPanel({
         onSubmit={handleCreateSubject}
       >
         <label className="form-field" htmlFor="new-subject-name">
-          <span>Thêm môn học mới</span>
+          <span>Tạo chuyên mục onboarding mới</span>
           <input
             id="new-subject-name"
             type="text"
             maxLength={255}
-            placeholder="Ví dụ: Data Engineering"
+            placeholder="Ví dụ: Nội quy lao động, Nghỉ phép & Bảo mật cơ bản"
             value={newSubjectName}
             onChange={(event) => setNewSubjectName(event.target.value)}
           />
@@ -301,65 +314,104 @@ function UploadPanel({
           type="submit"
           disabled={!newSubjectName.trim() || isCreatingSubject}
         >
-          {isCreatingSubject ? 'Đang thêm...' : 'Thêm môn'}
+          {isCreatingSubject ? 'Đang tạo...' : 'Thêm chuyên mục'}
         </button>
       </form>
 
       <div className="upload-divider" aria-hidden="true" />
 
       <form
-        className="upload-form"
+        className="upload-form-stack"
         ref={formRef}
         onSubmit={handleSubmit}
       >
-        <label className="form-field chapter-field">
-          <span>Chương</span>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            placeholder="Ví dụ: 3"
-            value={chapter}
-            onChange={(event) => setChapter(event.target.value)}
-          />
-        </label>
+        <div className="upload-form upload-form-versioned">
+          <label className="form-field chapter-field">
+            <span>Phiên bản (v)</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              placeholder="Ví dụ: 1"
+              value={chapter}
+              onChange={(event) => setChapter(event.target.value)}
+            />
+          </label>
 
-<label
-  className={`file-field ${
-    isDragging ? 'is-dragging' : ''
-  }`}
-  onDragEnter={handleDragOver}
-  onDragOver={handleDragOver}
-  onDragLeave={handleDragLeave}
-  onDrop={handleDrop}
->
-  <span>
-    {file
-      ? file.name
-      : 'Chọn hoặc kéo thả PDF, TXT hoặc DOCX vào đây'}
-  </span>
+          <label className="form-field effective-date-field">
+            <span>Ngày hiệu lực</span>
+            <input
+              type="date"
+              value={effectiveDate}
+              onChange={(event) => setEffectiveDate(event.target.value)}
+            />
+          </label>
 
-  <input
-    type="file"
-    accept={DOCUMENT_ACCEPT}
-    onChange={(event) => {
-      handleSelectedFile(
-        event.target.files?.[0] ?? null,
-      )
-    }}
-  />
-</label>
+          <label
+            className={`file-field ${
+              isDragging ? 'is-dragging' : ''
+            }`}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <span>
+              {file
+                ? file.name
+                : 'Chọn hoặc kéo thả văn bản nội quy (PDF, TXT, DOCX) vào đây'}
+            </span>
 
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={
-            isUploading
-            || subjects.length === 0
-          }
-        >
-          {isUploading ? 'Đang xử lý...' : 'Tải lên'}
-        </button>
+            <input
+              type="file"
+              accept={DOCUMENT_ACCEPT}
+              onChange={(event) => {
+                handleSelectedFile(
+                  event.target.files?.[0] ?? null,
+                )
+              }}
+            />
+          </label>
+
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={
+              isUploading
+              || subjects.length === 0
+            }
+          >
+            {isUploading ? 'Đang lập chỉ mục...' : 'Nạp văn bản'}
+          </button>
+        </div>
+
+        <div className="upload-version-options">
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={activateOnUpload}
+              onChange={(event) => setActivateOnUpload(event.target.checked)}
+            />
+            <span>Kích hoạt áp dụng ngay sau khi kiểm tra chỉ mục thành công</span>
+          </label>
+
+          {activateOnUpload && activeSubjectDocs.length > 0 && (
+            <label className="form-field supersedes-field">
+              <span>Thay thế văn bản cũ (tùy chọn)</span>
+              <select
+                value={supersedesId}
+                onChange={(event) => setSupersedesId(event.target.value)}
+              >
+                <option value="">Không thay thế (áp dụng song song)</option>
+                {activeSubjectDocs.map((doc) => (
+                  <option key={doc.document_id} value={doc.document_id}>
+                    Thay thế: {doc.filename} {doc.chapter ? `(v${doc.chapter})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </form>
 
       {error && (
@@ -376,6 +428,5 @@ function UploadPanel({
     </section>
   )
 }
-
 
 export default UploadPanel
