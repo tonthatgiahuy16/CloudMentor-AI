@@ -1,73 +1,74 @@
 # CloudMentor AI — Project Goals and Expected Outcomes
 
-> This document describes **why the project exists** and what the completed platform should achieve. It is a target, not a claim about the current build. Use [Target Architecture](./TARGET_ARCHITECTURE.md) for design decisions and [Project Status](./PROJECT_STATUS.md) for implementation evidence.
+> This document describes the product direction and expected outcomes. It is a target, not a claim that every capability is implemented. See [Target Architecture](./TARGET_ARCHITECTURE.md) for design and [Project Status](./PROJECT_STATUS.md) for evidence from the current build.
 
 ## 1. Purpose
 
-CloudMentor AI aims to turn learning documents and learner activity into a connected learning loop: reliable knowledge ingestion, answers with inspectable sources, structured practice, progress analysis, and recommendations for what to study next. The project is intended to demonstrate Data Engineering as the foundation shared by RAG, Quiz, Analytics, and Machine Learning, rather than a collection of disconnected features.
+CloudMentor AI is an **Enterprise Policy and Onboarding Platform**. It helps employees find answers grounded in company policies and helps training owners prepare reviewed onboarding assessments and inspect completion results. Data Engineering is the backbone: reliable ingestion, lifecycle management, traceability, and recovery support the search, quiz, and reporting experiences.
 
 ```text
-Documents -> Data Platform -> Knowledge -> RAG / Quiz
-          -> Learning Records -> Analytics -> ML when justified
-          -> Recommended Next Activity
+Company policy documents -> validated data pipeline -> versioned knowledge
+                                                   -> grounded policy answers
+                                                   -> reviewed onboarding quizzes
+Employee quiz attempts -> reliable records -> training overview and follow-up
 ```
 
-## 2. Goals
+The current MVP is intentionally a single-company demo using sample identities and sample policy content. It is not a legal decision system or a production HR compliance system.
 
-### Product goal
+## 2. Primary actors
 
-A learner should be able to organize material by subject, find an answer grounded in the material, practise with a quiz, see where they struggle, and receive a next activity supported by their learning history. The complete product requires two connected data domains:
+- **Training Admin:** manages policy documents and their effective dates, creates or reviews onboarding quizzes, publishes approved quizzes, and views training completion summaries.
+- **Employee:** looks up current policy information, completes assigned or available onboarding quizzes, and reviews personal results and referenced policy material.
 
-- **Knowledge data:** subjects, documents, topics or chapters, chunks, embeddings, and source references.
-- **Learning data:** users, quizzes, questions, attempts, answers, scores, timestamps, and progress.
+These are product roles. The current demo's separate workspaces do not provide authenticated identity or backend-enforced authorization; access control is a future requirement before real employee or multi-company use.
 
-### Engineering goal
+## 3. Goals
 
-Build a data platform whose results can be checked and whose failures can be repaired. The intended capabilities are:
+### Product goals
 
-- A common document contract for PDF, TXT, DOCX, and any later supported source, with testable Extract, Transform, Chunk, Embed, and Index stages.
-- Stable `document_id` and `chunk_id`, plus subject, page, source, and version metadata across write and read paths.
-- PostgreSQL as the system of record for relational data and lifecycle; Chroma as a derived retrieval index that can be deleted and rebuilt from retained canonical content.
-- Explicit lifecycle, validation, retry and idempotency rules; data quality checks at stage boundaries; logs and metrics sufficient to find affected records and recover.
-- Event transport and distributed processing only when a measured workload or product requirement justifies Kafka or Spark.
-- Curated, traceable learning datasets before training a personalization model.
+- Give employees answers based on policies applicable on the requested business date, with visible document and location references.
+- Keep policy versions traceable, including effective windows and the source version used by a quiz question.
+- Let training owners create and review question sets before publication; grading must use the approved answer key stored by the application.
+- Record quiz attempts and answers so employees can review their work and training owners can see completion and aggregate outcomes.
+- Make the current policy state, unavailable data, and source provenance clear instead of presenting unsupported answers as authoritative.
+
+### Data Engineering goals
+
+- Treat PostgreSQL as the system of record for document identity, policy applicability, quiz definitions, answer keys, and attempts.
+- Treat Chroma as a derived retrieval index that can be reconciled and rebuilt from retained source material and PostgreSQL state.
+- Preserve stable identities and lineage from source document/version through extracted content, chunks, retrieval citations, quiz questions, and quiz results where applicable.
+- Define validation, lifecycle, retry, idempotency, consistency, and recovery behavior at data boundaries.
+- Add observability and measured data-quality checks before increasing operational complexity.
+- Introduce Kafka, Spark, or Machine Learning only when workload evidence or a measured product need justifies them.
 
 ### Learning and portfolio goal
 
-The project owner aims to learn and explain the full data lifecycle: the problem, source and output contracts, storage boundaries, failure modes, trade-offs, tests, and measured outcomes. This is a learning objective; a portfolio or CV may claim only the subset supported by current code and evidence in [Project Status](./PROJECT_STATUS.md).
+The project owner aims to learn and explain the complete data lifecycle: source contracts, pipeline stages, storage boundaries, failure modes, trade-offs, tests, and measured outcomes. Portfolio claims must describe the implemented and evidenced subset in [Project Status](./PROJECT_STATUS.md), distinguishing local verification, user-reported end-to-end checks, and planned work.
 
-## 3. Expected outcomes when the full roadmap is complete
+## 4. Expected outcomes as the platform matures
 
-### Reliable knowledge pipeline
+### Governed policy knowledge
 
-A supported document can be ingested, validated, indexed, queried, deleted from active use, and recovered or rebuilt using stable identity. A failed or repeated operation does not silently create duplicate business effects. The canonical source remains available for recovery, and PostgreSQL and Chroma can be reconciled.
+A policy can be ingested, validated, versioned, assigned an effective window, retrieved only while applicable, and cited back to its source. PostgreSQL determines applicability; stale or inconsistent derived vectors must not make an obsolete version eligible. Operators have a documented way to detect and repair index drift.
 
-### Traceable RAG
+### Reviewed onboarding assessments
 
-An answer is constrained to retrieved material in the requested scope and carries references sufficient to inspect the source document, page, and chunk. Retrieval relevance, citation correctness, and answer faithfulness are evaluated on a curated set; merely displaying a citation is not proof of correctness.
+Training owners can prepare and review quizzes tied to policy source versions. Published questions have stable answer keys; the server grades submissions and stores attempts. Draft generation, if introduced, is assistance only and does not establish a correct answer without review.
 
-### Measurable learning
+### Useful training records
 
-Quiz attempts produce complete records that can be queried by user, subject, chapter or topic, and time. Analytics can identify weak topics, difficult questions, and progress over time. The system measures data completeness and correctness before using those records for decisions.
+Employees can inspect their quiz results and cited material. Training owners can inspect completion and aggregate outcomes. Any analytics must have clear definitions, appropriate data access, and retention rules; scores are not employment or legal-compliance determinations.
 
-### Justified personalization
+### Safe organizational growth
 
-Historical, versioned learning data can support a simple baseline and, if it adds measurable value, a Machine Learning model for weak-topic prediction or next-activity ranking. Recommendations link back to their input data and model or rule version. Improvement in learning outcomes must be measured before claiming that personalization works better.
+Before supporting real companies or employee identities, the platform must add authentication, backend authorization, tenant isolation, data minimization, and retention/deletion rules, then verify those boundaries with tests. Production operations also require independent backups, restore exercises, monitoring, and shared rate limiting.
 
-## 4. Completion evidence
+## 5. Completion evidence
 
-The final outcomes above become implementation claims only after the relevant capability has:
+Treat a capability as implemented only when its documented input/output and ownership boundaries are backed by code, relevant automated or reproducible manual checks, data-quality and consistency checks, and a recovery path where needed. Product-value claims require user evidence; accuracy, throughput, scale, and learning-improvement claims require measurement. See [Project Status](./PROJECT_STATUS.md) for the current snapshot and limitations.
 
-1. A documented input, output, identity, and ownership boundary.
-2. Reproducible tests or a recorded manual run covering normal and important failure paths.
-3. Data quality and consistency checks for its stored outputs.
-4. A recovery path for retries, partial failure, deletion, or rebuild where applicable.
-5. Evidence of user or learning value where the claim concerns analytics or recommendations.
+## 6. Scope and sequencing
 
-Use [Project Status](./PROJECT_STATUS.md) to record the exact commit, test or runtime evidence, remaining limitations, and the difference between implemented, manually verified, and planned work. No fixed throughput, accuracy, scale, or learning-improvement number is asserted here before measurement.
+The current demo establishes three slices: policy versioning and date-aware retrieval; persisted onboarding quizzes with server-side grading and provenance; and employee/training-admin demo workspaces. Next, strengthen security, operational recovery, and observability before using real employee records or presenting the system as production-ready. Advanced analytics, event streaming, distributed processing, and ML remain future options driven by evidence rather than MVP requirements.
 
-## 5. Scope and sequencing
-
-Deliver a small, trustworthy document-to-answer slice first. Strengthen reproducibility, lifecycle, durable source retention, idempotency, reconciliation, and multi-source ingestion before expanding the learning application. Add Quiz and attempt history before analytics; add Kafka, Spark, and ML when latency, volume, processing complexity, or measured product value creates a concrete need. The phase boundaries and component responsibilities are in [Target Architecture](./TARGET_ARCHITECTURE.md).
-
-The source document *CloudMentor_AI_Project_Goals_and_Final_Outcomes.docx* (19 August 2026) also contains interview examples. Those examples describe an intended full platform and include an old progress snapshot; they are not evidence of current implementation. Current answers for an interview must be rebuilt from [Project Status](./PROJECT_STATUS.md).
+The source document *CloudMentor_AI_Project_Goals_and_Final_Outcomes.docx* (19 August 2026) describes an earlier individual learning-product direction and contains an old progress snapshot. It is historical context, not the current product goal or implementation evidence.
