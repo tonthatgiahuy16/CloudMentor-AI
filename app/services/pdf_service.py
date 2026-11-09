@@ -326,7 +326,8 @@ class PDFService:
             )
 
             self.document_repo.mark_indexed(
-                document_id
+                document_id,
+                indexed_chunk_count=len(chunks),
             )
 
             return len(chunks)

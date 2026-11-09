@@ -1,8 +1,11 @@
+from datetime import date
+
 from sqlalchemy import (
     String,
     Integer,
     BigInteger,
     DateTime,
+    Date,
     ForeignKey,
     CheckConstraint,
     Text,
@@ -98,6 +101,24 @@ class Document(Base):
         nullable=True,
     )
 
+    # A NULL effective_from means this indexed document has not been
+    # explicitly activated as a policy version.
+    effective_from: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    # Exclusive end date: the version is not applicable on this date.
+    effective_until: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    indexed_chunk_count: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
     deleted_at: Mapped[object | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -162,6 +183,18 @@ class Document(Base):
             "file_size_bytes IS NULL OR "
             "file_size_bytes >= 0",
             name="chk_documents_file_size_bytes",
+        ),
+
+        CheckConstraint(
+            "indexed_chunk_count IS NULL OR indexed_chunk_count > 0",
+            name="chk_documents_indexed_chunk_count",
+        ),
+
+        CheckConstraint(
+            "effective_until IS NULL OR "
+            "(effective_from IS NOT NULL AND "
+            "effective_until > effective_from)",
+            name="chk_documents_effective_window",
         ),
 
         Index(

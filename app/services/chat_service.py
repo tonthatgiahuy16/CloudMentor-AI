@@ -75,6 +75,7 @@ class ChatService:
         embedder: Any | None = None,
         retriever: Any | None = None,
         generator: Any | None = None,
+        document_repo: Any | None = None,
     ):
         if embedder is None or retriever is None or generator is None:
             from app.llm.generator import AnswerGenerator
@@ -90,18 +91,44 @@ class ChatService:
         self.embedder = embedder
         self.retriever = retriever
         self.generator = generator
+        self.document_repo = document_repo
 
-    def ask(self, question: str, subject_id: str | None = None) -> dict[str, Any]:
+    def ask(
+        self,
+        question: str,
+        subject_id: str | None = None,
+        as_of=None,
+    ) -> dict[str, Any]:
         normalized_question = question.strip()
         if not normalized_question:
             raise ValueError("question must not be empty")
 
         logger.info("Question received")
         query_vector = self.embedder.embed_query(normalized_question)
-        results = self.retriever.search(
-            query_vector,
-            subject_id=subject_id,
-        )
+        if self.document_repo is None:
+            results = self.retriever.search(
+                query_vector,
+                subject_id=subject_id,
+            )
+        else:
+            from app.core.date_utils import get_current_business_date
+
+            target_as_of = (
+                as_of
+                if as_of is not None
+                else get_current_business_date()
+            )
+            allowed_document_ids = (
+                self.document_repo.list_applicable_document_ids(
+                    subject_id=subject_id,
+                    as_of=target_as_of,
+                )
+            )
+            results = self.retriever.search(
+                query_vector,
+                subject_id=subject_id,
+                allowed_document_ids=allowed_document_ids,
+            )
 
         if not results:
             logger.info(

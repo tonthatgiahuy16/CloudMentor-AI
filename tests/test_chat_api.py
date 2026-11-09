@@ -25,6 +25,7 @@ class FakeChatService:
         self,
         question,
         subject_id=None,
+        as_of=None,
         ):
         self.calls.append((question, subject_id))
         return self.result

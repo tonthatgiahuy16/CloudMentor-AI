@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
@@ -241,6 +241,132 @@ class DocumentRepository:
             .all()
         )
 
+    def list_applicable_document_ids(
+        self,
+        *,
+        subject_id: str,
+        as_of: date,
+    ) -> list[str]:
+        rows = (
+            self.db.query(Document.document_id)
+            .join(
+                Subject,
+                Subject.subject_id == Document.subject_id,
+            )
+            .filter(
+                Document.subject_id == subject_id,
+                Document.status == "INDEXED",
+                Document.effective_from.is_not(None),
+                Document.effective_from <= as_of,
+                or_(
+                    Document.effective_until.is_(None),
+                    Document.effective_until > as_of,
+                ),
+                Subject.status == "ACTIVE",
+            )
+            .order_by(Document.document_id.asc())
+            .all()
+        )
+        return [row.document_id for row in rows]
+
+    def activate_policy_version(
+        self,
+        *,
+        document_id: str,
+        effective_from: date,
+        supersedes_document_id: str | None = None,
+    ) -> Document:
+        try:
+            document = (
+                self.db.query(Document)
+                .filter(Document.document_id == document_id)
+                .with_for_update()
+                .first()
+            )
+
+            if document is None:
+                raise RuntimeError("Document not found")
+            if document.status != "INDEXED":
+                raise RuntimeError(
+                    "Only indexed documents can be activated"
+                )
+            if document.source_uri is None:
+                raise RuntimeError(
+                    "Document has no retained source"
+                )
+            if document.indexed_chunk_count is None:
+                raise RuntimeError(
+                    "Document index has not been verified"
+                )
+            if document.effective_from is not None:
+                if (
+                    document.effective_from == effective_from
+                    and supersedes_document_id is None
+                ):
+                    return document
+                raise RuntimeError(
+                    "Document version is already activated"
+                )
+
+            subject = (
+                self.db.query(Subject)
+                .filter(Subject.subject_id == document.subject_id)
+                .first()
+            )
+            if subject is None or subject.status != "ACTIVE":
+                raise RuntimeError("Subject is not active")
+
+            replaced = None
+            if supersedes_document_id is not None:
+                if supersedes_document_id == document_id:
+                    raise RuntimeError(
+                        "A document cannot supersede itself"
+                    )
+                replaced = (
+                    self.db.query(Document)
+                    .filter(
+                        Document.document_id
+                        == supersedes_document_id
+                    )
+                    .with_for_update()
+                    .first()
+                )
+                if replaced is None:
+                    raise RuntimeError(
+                        "Superseded document not found"
+                    )
+                if replaced.subject_id != document.subject_id:
+                    raise RuntimeError(
+                        "Documents must belong to the same category"
+                    )
+                if (
+                    replaced.status != "INDEXED"
+                    or replaced.effective_from is None
+                ):
+                    raise RuntimeError(
+                        "Only an applicable indexed document can be superseded"
+                    )
+                if effective_from <= replaced.effective_from:
+                    raise RuntimeError(
+                        "Replacement must start after the existing version"
+                    )
+                if (
+                    replaced.effective_until is not None
+                    and replaced.effective_until < effective_from
+                ):
+                    raise RuntimeError(
+                        "The selected document is not applicable on the replacement date"
+                    )
+                replaced.effective_until = effective_from
+
+            document.effective_from = effective_from
+            self.db.commit()
+            self.db.refresh(document)
+            return document
+        except Exception:
+            self.db.rollback()
+            raise
+
     def list_reconciliation_records(
         self,
     ) -> list[DocumentReconciliationRecord]:
@@ -421,7 +547,19 @@ class DocumentRepository:
         return document
 
 
-    def mark_indexed(self, document_id: str):
+    def mark_indexed(
+        self,
+        document_id: str,
+        indexed_chunk_count: int | None = None,
+    ):
+        if (
+            indexed_chunk_count is not None
+            and indexed_chunk_count <= 0
+        ):
+            raise ValueError(
+                "indexed_chunk_count must be greater than zero"
+            )
+
         document = (
             self.db.query(Document)
             .filter(Document.document_id == document_id)
@@ -432,6 +570,8 @@ class DocumentRepository:
             raise RuntimeError("Document not found")
 
         document.status = "INDEXED"
+        if indexed_chunk_count is not None:
+            document.indexed_chunk_count = indexed_chunk_count
         document.current_stage = None
         document.failed_stage = None
         document.error_message = None

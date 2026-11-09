@@ -5,6 +5,7 @@ from fastapi import (
     Request,
     status,
 )
+from functools import lru_cache
 from app.core.rate_limit import enforce_chat_rate_limit
 from app.llm.exceptions import (
     LLMProviderError,
@@ -12,8 +13,8 @@ from app.llm.exceptions import (
 )
 from app.schemas.chat import ChatRequest, ChatResponse
 
-from functools import lru_cache
 from app.core.database import SessionLocal
+from app.repos.document_repository import DocumentRepository
 from app.repos.subject_repository import (
     SubjectRepository,
 )
@@ -24,11 +25,33 @@ router = APIRouter(
     tags=["Chat"],
 )
 
+
+class ApplicableDocumentResolver:
+    """Resolve applicable documents with a short-lived DB session."""
+
+    def list_applicable_document_ids(
+        self,
+        *,
+        subject_id: str,
+        as_of,
+    ) -> list[str]:
+        db = SessionLocal()
+        try:
+            return DocumentRepository(db).list_applicable_document_ids(
+                subject_id=subject_id,
+                as_of=as_of,
+            )
+        finally:
+            db.close()
+
+
 @lru_cache
 def get_chat_service():
     from app.services.chat_service import ChatService
 
-    return ChatService()
+    service = ChatService()
+    service.document_repo = ApplicableDocumentResolver()
+    return service
 
 
 def get_chat_subject_repository():
@@ -75,6 +98,7 @@ def chat(
         return chat_service.ask(
             request.question,
             subject_id=request.subject_id,
+            as_of=request.as_of,
         )
     except LLMProviderUnavailableError as exc:
         raise HTTPException(

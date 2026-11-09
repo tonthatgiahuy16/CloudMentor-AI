@@ -82,6 +82,8 @@ CHAT_RATE_LIMIT_PER_MINUTE = int(
     os.getenv("CHAT_RATE_LIMIT_PER_MINUTE", "12")
 )
 
+APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Ho_Chi_Minh")
+
 DEMO_SEED_TOKEN = os.getenv("DEMO_SEED_TOKEN", "")
 DEMO_SEED_DIR = Path(os.getenv("DEMO_SEED_DIR", BASE_DIR / "demo-sources"))
 

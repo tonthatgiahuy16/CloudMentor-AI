@@ -157,6 +157,10 @@ def test_list_documents_returns_active_documents():
             "status": "INDEXED",
             "uploaded_at": "2026-10-04T10:00:00Z",
             "indexed_at": "2026-10-04T10:01:00Z",
+            "effective_from": None,
+            "effective_until": None,
+            "effective_date": None,
+            "is_current": False,
         }
     ]
 
