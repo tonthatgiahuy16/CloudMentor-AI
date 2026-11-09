@@ -32,7 +32,7 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The user reported generally successful manual end-to-end testing of policy lookup and quiz results. The backend suite last reported `437 passed, 3 skipped, 1 warning` before `test_date_utils.py` was added to pytest's explicit discovery list; a full rerun after that correction is pending. Frontend lint and production build passed. Three optional MinIO/PostgreSQL integration cases were skipped. CI does not exercise live PostgreSQL, Chroma, embeddings, and Gemini together as one workflow. See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for evidence and limitations. This project does not claim production readiness: authentication, backend authorization, tenant isolation, independent backups, monitoring, and alerting are not established.
+The user reported generally successful manual end-to-end testing of policy lookup and quiz results. After `test_date_utils.py` was added to pytest's explicit discovery list, the backend suite completed with `439 passed, 3 skipped, 1 warning in 7.79s` (user-reported). Frontend lint and production build passed in a separate local run. Three optional MinIO/PostgreSQL integration cases were skipped. CI does not exercise live PostgreSQL, Chroma, embeddings, and Gemini together as one workflow. See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for evidence and limitations. This project does not claim production readiness: authentication, backend authorization, tenant isolation, independent backups, monitoring, and alerting are not established.
 
 ## Local reproducible demo
 
