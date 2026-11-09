@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from pydantic import (
@@ -18,6 +19,7 @@ class ChatRequest(BaseModel):
         min_length=1,
         max_length=100,
     )
+    as_of: date | None = None
 
     @field_validator("question")
     @classmethod

@@ -173,11 +173,24 @@ class VectorStore:
             where={"document_id": document_id}
         )
         return count
-        
 
-
-
-
-
-
-    
+    def count_by_document_id(self, document_id: str) -> int:
+        results = self.collection.get(
+            where={"document_id": document_id},
+            include=["metadatas"],
+        )
+        chunk_ids = results.get("ids") or []
+        metadatas = results.get("metadatas") or []
+        if len(chunk_ids) != len(metadatas):
+            raise RuntimeError(
+                "Vector index returned incomplete document metadata"
+            )
+        if any(
+            not isinstance(metadata, dict)
+            or metadata.get("document_id") != document_id
+            for metadata in metadatas
+        ):
+            raise RuntimeError(
+                "Vector index document lineage verification failed"
+            )
+        return len(chunk_ids)

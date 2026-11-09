@@ -121,7 +121,8 @@ def test_retry_failed_document_reuses_source_and_document_id(
         embeddings,
     )
     service.document_repo.mark_indexed.assert_called_once_with(
-        "failed-document-id"
+        "failed-document-id",
+        indexed_chunk_count=len(chunks),
     )
 
 
@@ -706,7 +707,8 @@ def test_process_txt_preserves_exact_line_ranges(
         embeddings,
     )
     service.document_repo.mark_indexed.assert_called_once_with(
-        "document-1"
+        "document-1",
+        indexed_chunk_count=len(chunks),
     )
     service.document_repo.mark_failed.assert_not_called()
 
@@ -812,7 +814,8 @@ def test_rebuild_retained_txt_reuses_identity_and_lineage(
         "document-1"
     )
     service.document_repo.mark_indexed.assert_called_once_with(
-        "document-1"
+        "document-1",
+        indexed_chunk_count=len(chunks),
     )
 
 
@@ -877,7 +880,8 @@ def test_process_docx_preserves_exact_paragraph_ranges(
     )
 
     service.document_repo.mark_indexed.assert_called_once_with(
-        "document-1"
+        "document-1",
+        indexed_chunk_count=len(chunks),
     )
     service.document_repo.mark_failed.assert_not_called()
 
@@ -964,7 +968,8 @@ def test_rebuild_retained_docx_reuses_identity_and_lineage(
         "document-1"
     )
     service.document_repo.mark_indexed.assert_called_once_with(
-        "document-1"
+        "document-1",
+        indexed_chunk_count=len(chunks),
     )
 
 

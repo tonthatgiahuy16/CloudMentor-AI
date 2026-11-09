@@ -3,273 +3,193 @@
 ![Project Status](https://img.shields.io/badge/status-architecture%20design-2E74B5?style=flat-square)
 ![Focus](https://img.shields.io/badge/focus-Data%20Engineering-0E7490?style=flat-square)
 ![RAG](https://img.shields.io/badge/RAG-target%20capability-6B7280?style=flat-square)
-![Kafka](https://img.shields.io/badge/Kafka-planned-231F20?style=flat-square&logo=apachekafka&logoColor=white)
-![Spark](https://img.shields.io/badge/Spark-planned-E25A1C?style=flat-square&logo=apachespark&logoColor=white)
-![Machine Learning](https://img.shields.io/badge/ML-planned-7C3AED?style=flat-square)
 
-> **CloudMentor AI** is an AI Learning Data Platform that uses **Data Engineering as its backbone** to transform documents and learning behavior into knowledge, analytics, and personalized learning.
+> **CloudMentor AI** is an Enterprise Policy and Knowledge Platform for employee onboarding. It helps employees find answers grounded in current internal policies and helps training owners deliver reviewed onboarding quizzes.
 
 > [!IMPORTANT]
-> This document describes the approved long-term target architecture.
-> Planned components are not current implementation claims.
-> See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for the verified baseline.
+> This document describes the target architecture and the agreed MVP boundary. It does not claim that planned capabilities are implemented. See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for the verified application baseline.
 
-The product purpose and expected outcomes are in [`PROJECT_GOALS.md`](./PROJECT_GOALS.md). This design adapts the August 2026 *CloudMentor_AI_Final_Target_Architecture.docx* to the later implementation baseline; phase numbering follows the current repository rather than the older ten-step estimate in that document.
+The product goals are described in [`PROJECT_GOALS.md`](./PROJECT_GOALS.md). PostgreSQL is the system of record for policy metadata, version applicability, and training records. Chroma is a derived retrieval index; it is never authoritative for whether a policy version is applicable.
 
-## 1. Project Overview
+## 1. Product Scope
 
-CloudMentor AI is designed as an end-to-end learning data platform, not merely a PDF chatbot.
+### MVP
 
-The platform will:
+The first product slice supports one sample company and a focused onboarding policy collection:
 
-- Ingest and manage learning documents from multiple formats.
-- Build a searchable knowledge base for context-constrained RAG with source references.
-- Generate and record Quiz interactions and learning history.
-- Process document events and learning events at scale.
-- Produce analytical datasets and Machine Learning features.
-- Detect weak topics and recommend the next learning activity.
+- A training owner uploads and manages onboarding documents.
+- Employees ask questions and receive answers grounded in applicable documents, with inspectable source references.
+- A training owner creates or reviews quiz questions before employees can take them.
+- The server grades submissions against approved answer keys and records training results.
 
-Overall value flow:
+The MVP does not include multi-company tenancy, fine-grained department-based authorization, HR-system integrations, automated employment or legal decisions, advanced analytics, Kafka, Spark, or machine-learning recommendations. Use sample data until authentication and authorization are implemented and reviewed for real employee data.
 
-```text
-Documents -> Data Platform -> Knowledge -> RAG / Quiz
-          -> Learning Events -> Analytics -> Machine Learning
-          -> Personalized Learning
-```
+### Design principles
 
-### Project status
+- Reuse the existing document ingestion, canonical source storage, lineage, lifecycle, and recovery foundations where they fit.
+- Keep PostgreSQL authoritative for document identity, version lifecycle, approved quiz content, and attempts.
+- Treat Chroma as a disposable, rebuildable index of document chunks.
+- Fail closed: if the applicable document set cannot be resolved or indexed evidence is unavailable, do not silently fall back to obsolete policy content.
+- Add distributed processing and analytics only when a measured workload or product requirement justifies them.
 
-| Area | Status |
-|---|---|
-| Product vision and target architecture | Documented |
-| Current Data Engineering implementation | See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) |
-| Current RAG implementation | See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) |
-| Kafka and Spark | Planned phases |
-| Analytics and Machine Learning | Planned phases |
-
-## 2. Architecture Diagram
+## 2. Architecture Overview
 
 ```mermaid
-flowchart TB
-    U[User] --> FE[Frontend]
-    FE --> API[FastAPI API Layer]
+flowchart TD
+    Owner[Training Owner] --> UI[Frontend]
+    Employee[New Employee] --> UI
+    UI --> API[FastAPI API]
 
-    API --> DU[Document Upload]
-    DU --> FS[(Source File Storage)]
-    DU --> DP[Direct Processing]
-    DP --> EX[Extract]
-    DU -. future when justified .-> KDE[Kafka: Document Events]
-    KDE --> IC[Ingestion Consumer]
+    API --> Manage[Document and Version Management]
+    Manage --> PG[(PostgreSQL<br/>documents, versions, lifecycle, quizzes, attempts)]
+    Manage --> Source[(Canonical Source Storage)]
+    Manage --> Pipeline[Extract → Transform → Chunk → Embed]
+    Pipeline --> PG
+    Pipeline --> Chroma[(Chroma<br/>derived vector index)]
 
-    IC --> EX[Extract]
-    EX --> TR[Transform]
-    TR --> CK[Chunk + Metadata]
-    CK --> EM[Embedding]
-    EM --> IX[Index]
+    Employee --> Question[Policy Question]
+    Question --> API
+    API --> Resolve[Resolve Applicable Document IDs<br/>from PostgreSQL]
+    Resolve --> Retrieve[Retriever constrained to allowed document IDs]
+    Chroma --> Retrieve
+    Retrieve --> Context[Retrieved chunks + source lineage]
+    Context --> LLM[Answer Generator]
+    LLM --> Response[Answer + document and location references]
+    Response --> UI
 
-    IX --> PG[(PostgreSQL)]
-    IX --> CH[(Chroma Vector Store)]
-
-    API --> Q[Question]
-    Q --> RT[Retriever]
-    RT <--> CH
-    RT --> GM[Gemini / Answer Generator]
-    GM --> AR[Answer + Sources + Lineage]
-    AR --> API
-
-    API --> QZ[Quiz / Learning Activity]
-    QZ --> PG
-    QZ --> KLE[Kafka: Learning Events]
-
-    KLE --> SP[Spark Batch / Structured Streaming]
-    SP --> AN[Analytics Tables]
-    AN --> FT[Feature Engineering]
-    FT --> ML[ML Training / Inference]
-    ML --> PS[Personalization]
-    PS --> API
+    Owner --> Review[Create or review quiz]
+    Review --> QuizStore[(PostgreSQL<br/>approved quiz, questions, answer keys, source versions)]
+    Employee --> Submit[Quiz submission]
+    Submit --> Grade[Server-side grading]
+    Grade --> QuizStore
+    QuizStore --> Overview[Training completion overview]
+    Overview --> Owner
 ```
 
 ### Main data flows
 
-**Document ingestion**
+**Policy document ingestion and version activation**
 
 ```text
-Upload -> Store source file -> Direct processing
-       -> Extract -> Transform -> Chunk -> Embed -> Index
-       -> PostgreSQL registry/lifecycle + Chroma vector index
-
-Future asynchronous path when justified:
-Upload -> Store source file -> Publish document event
-       -> Consumer -> Extract -> Transform -> Chunk -> Embed -> Index
+Upload -> Validate and retain canonical source
+       -> Extract -> Transform -> Chunk -> Embed -> Index in Chroma
+       -> Verify indexing and lineage
+       -> PostgreSQL records version lifecycle and applicability
 ```
 
-**RAG serving**
+A new version is not made applicable until its source is retained, processing succeeds, and its index records are verified. PostgreSQL owns the activation decision. Version transitions must be represented as explicit lifecycle operations; PostgreSQL and Chroma do not share a transaction.
+
+An unactivated document has no `effective_from` date and is excluded from policy retrieval. The activation operation accepts an effective date and an optional document being replaced. It requires the new document to be `INDEXED`, to have retained source metadata, and to have the same verified chunk count in PostgreSQL and Chroma. Activation and the replaced document's exclusive `effective_until` date are committed together in PostgreSQL. Existing indexed documents are backfilled from their upload date during migration to preserve their current availability.
+
+**Policy question and answer**
 
 ```text
-Question -> Query embedding -> Retriever + metadata filters
-         -> Relevant chunks -> Gemini
-         -> Answer + source + page + document_id + chunk_id
+Question + category -> PostgreSQL resolves applicable document_ids
+                    -> Retriever searches Chroma only within those IDs
+                    -> Context-constrained answer generation
+                    -> Answer + document/version/location references
 ```
 
-**Learning analytics and personalization**
+The MVP answers using currently applicable policy versions. Historical “what applied at a past date?” queries are outside the initial scope. If PostgreSQL cannot resolve an applicable set, or no eligible indexed evidence is available, the system returns a controlled no-evidence response instead of using stale chunks.
+
+**Quiz authoring and completion**
 
 ```text
-Quiz / User Activity -> PostgreSQL + Kafka
-                     -> Spark Batch / Streaming
-                     -> Analytics -> Features -> ML
-                     -> Recommendation
+Training owner creates or reviews questions
+                    -> PostgreSQL stores approved questions, answer keys,
+                       and source document/version references
+Employee takes an approved quiz -> Submission -> Server-side grading
+                                -> PostgreSQL stores attempt and result
+                                -> Training owner views completion overview
 ```
 
-The following capabilities apply across all flows:
+An LLM may assist with draft question generation in a later iteration, but generated questions and answers require human review before publication. The client never supplies the authoritative answer key or grading result.
 
-- Data Quality
-- Observability
-- Data Lineage
-- Identity and metadata propagation
-- Lifecycle and failure management
+## 3. Policy Versioning and Retrieval Safety
 
-### Component responsibility map
+PostgreSQL is the authority for which policy documents may support an answer. Chroma metadata is useful for candidate search and diagnostics, but a `current` flag copied into Chroma is not sufficient to establish applicability.
 
-This is the **target** responsibility map from the approved architecture report, condensed for use during implementation. Presence in this table does not mean that a component exists in the current application.
+For each question, the application resolves the eligible `document_id` set from PostgreSQL using the MVP's version and effective-date rules. The retriever constrains Chroma search to that set. The implementation must verify that the installed Chroma version and query path support the required filter form; if not, it must use a safe alternative that still enforces the PostgreSQL allow-list and does not return stale content.
 
-| Area | Component | Responsibility and intended output |
+Version replacement follows a guarded sequence:
+
+1. Retain and register the new source version.
+2. Process and index it while it is not yet applicable.
+3. Verify expected chunks and their document/source lineage.
+4. In a PostgreSQL transaction, update the applicability state so the new version becomes active and the replaced version ceases to be eligible.
+5. Reconcile or remove stale derived chunks separately; correctness must not depend on immediate Chroma metadata mutation or deletion.
+
+This avoids requiring a distributed transaction between PostgreSQL and Chroma. If indexing or verification fails, the new version is not activated. If Chroma still contains old chunks after a version transition, PostgreSQL's eligible document IDs prevent their use in new answers. Retrieval must fail closed when it cannot enforce that restriction.
+
+Effective-date and supersession rules must be explicit in the data contract. At minimum, the application needs to distinguish a registered version from one that is applicable now. The exact treatment of future-dated and expired policies must be consistent in PostgreSQL selection and API behavior.
+
+## 4. Component Responsibilities
+
+| Area | Component | Responsibility |
 | --- | --- | --- |
-| Experience | 1. Frontend | Collect upload, subject, question, quiz, and progress actions; render responses. |
-| Experience | 2. FastAPI API layer | Validate requests and route them to services; return stable response contracts. |
-| Control | 3. PostgreSQL subject registry | Own subject identity and metadata used for data scoping. |
-| Control | 4. PostgreSQL document registry | Own document identity, lifecycle, timestamps, and failure metadata. |
-| Control | 5. Kafka document events | Carry document events to consumers when asynchronous processing is justified. |
-| Ingestion | 6. Extract | Convert supported source formats into raw document content. |
-| Ingestion | 7. Transform | Clean and normalize extracted text. |
-| Ingestion | 8. Chunk | Produce retrieval-sized text units with stable order and boundaries. |
-| Ingestion | 9. Metadata and identity | Propagate document, chunk, subject, page, source, and version references. |
-| Ingestion | 10. Embedding | Produce document and query vectors with a known model version. |
-| Ingestion | 11. Index | Persist text, metadata, and vectors under stable record identities. |
-| Ingestion | 12. Chroma | Serve similarity search and metadata filtering as a derived index. |
-| RAG read path | 13. Retriever | Select relevant chunks within the requested scope. |
-| RAG read path | 14. Read-path lineage | Preserve chunk, document, page, and source references through retrieval. |
-| RAG read path | 15. Answer generator | Generate an answer from controlled retrieved context. |
-| RAG read path | 16. Chat API response | Return the answer with references that users can inspect. |
-| Lifecycle | 17. Document lifecycle | Record processing, failure, retry, and deletion state in PostgreSQL. |
-| Lifecycle | 18. Delete by `document_id` | Remove all derived records for one document without filename matching. |
-| Learning | 19. Quiz module | Own structured quizzes, questions, and answers in PostgreSQL. |
-| Learning | 20. User attempts | Record answers, correctness, score, topic, and timestamp. |
-| Learning | 21. Kafka learning events | Transport learning events when downstream decoupling is justified. |
-| Analytics | 22. Spark batch | Build curated historical datasets when distributed processing is needed. |
-| Analytics | 23. Spark Structured Streaming | Build continuous aggregates or features when latency requirements justify it. |
-| Analytics | 24. Analytics layer | Produce progress, weak-topic, and quiz-difficulty measures. |
-| ML | 25. Feature engineering | Create traceable and versioned model inputs from curated data. |
-| ML | 26. Model training | Train and evaluate a model against an explicit baseline. |
-| ML | 27. Model inference | Produce versioned predictions or rankings for application use. |
-| ML | 28. Personalization | Choose a next learning activity using measured evidence. |
-| Platform | 29. Observability | Expose lifecycle state, logs, metrics, health, and failure signals. |
-| Platform | 30. Data quality | Check schema, completeness, duplicates, and cross-store consistency. |
-| Platform | 31. Data lineage | Trace source-to-answer and attempt-to-recommendation paths. |
+| Experience | Frontend | Provide policy upload/management, employee question flow, approved quiz flow, and training overview. Clearly distinguish unavailable data from empty results. |
+| API | FastAPI routes | Validate requests, enforce the available access boundary, and return stable response contracts. Authentication and authorization are prerequisites before real employee data is used. |
+| Policy control | PostgreSQL document registry | Own document identity, category/scope, source metadata, version relationships, effective dates, lifecycle, and applicability. |
+| Source retention | Local or MinIO source storage | Retain canonical source bytes used for processing, citation, retry, and rebuild. |
+| Ingestion | Extract, transform, chunk, embed | Convert supported sources into chunks while preserving document identity and page/line/paragraph locations. |
+| Derived retrieval | Chroma | Store searchable vectors and retrieval metadata. It can be reconciled or rebuilt from canonical sources and PostgreSQL records. |
+| Version resolver | PostgreSQL-backed application service | Resolve the `document_id` allow-list for a question before retrieval. It is the authority for applicability. |
+| RAG read path | Retriever and answer generator | Search only allowed document IDs, preserve lineage, constrain generation to retrieved evidence, and return inspectable citations. |
+| Quiz authoring | PostgreSQL-backed quiz module | Store approved quiz definitions, questions, answer keys, and source document/version references. Draft generation is not publication. |
+| Training records | PostgreSQL-backed attempt service | Grade on the server and store the minimum required attempt, score, completion time, and employee association. |
+| Operations | Lifecycle, reconciliation, and logs | Expose ingestion outcomes and cross-store drift; keep repair bounded, auditable, and operator-controlled where appropriate. |
 
-### Identity, lineage, and quality contracts
+The MVP uses one sample company and does not require a `company_id`/`tenant_id` filter in Chroma. Existing subject or category scoping may be reused only where its current semantics are verified and documented. Multi-company tenancy and department-level access controls are future design work, not implicit properties of this MVP.
+
+## 5. Identity, Lineage, Quality, and Privacy Contracts
 
 | Path | Identity that must survive | Checkable outcome |
 | --- | --- | --- |
-| Write | `source_uri` or retained file reference → `document_id` → `chunk_id` or `chunk_index` → index record | A retry, delete, or rebuild can select the intended document and all of its derived records. |
-| Read | question and scope → retrieved `chunk_id` → `document_id`, page, source → answer | An answer's cited material can be inspected and its scope checked. |
-| Learning | `user_id` → `attempt_id`, question, topic, score, time → event → aggregate → feature → model version | A recommendation can be traced back to the learning records and transformation that produced it. |
-| Lifecycle | `document_id` → state transition, processing time, failure stage, retry and delete or rebuild action | An operator can identify what failed, what was affected, and how to resume safely. |
+| Write | Retained source → `document_id` → version identity → `chunk_id` → Chroma record | Retry, delete, audit, and rebuild target the intended source version and all its derived chunks. |
+| Policy read | Question/category → PostgreSQL eligible `document_id` set → retrieved `chunk_id` → document/version/location → answer | Every cited chunk belongs to an eligible document version; obsolete versions cannot enter the answer context. |
+| Version activation | New source version → processing/index verification → PostgreSQL applicability transition | A failed or incomplete index does not make the new version applicable; old derived chunks are harmless to retrieval after they become ineligible. |
+| Quiz | Approved quiz/question → answer key → source document/version → attempt/submission → graded result | The server grades against the approved stored key and the question's source version can be inspected. |
+| Lifecycle | `document_id` → state transition, processing stage, failure, retry, delete, or rebuild action | An operator can identify the affected version and recover or reconcile it safely. |
 
-Stage boundaries need schema and required-field checks; content checks should catch empty text, missing metadata, and duplicates. Operational signals should include processing duration, throughput, failure counts, retrieval results, and event lag when event processing is introduced. These are design requirements; implementation and test coverage belong in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
+Data quality checks should cover required metadata, non-empty extracted content, stable identities, expected indexed chunks, valid version relationships, approved quiz answer keys, and source references for published questions. RAG evaluation should include current-version and obsolete-version fixtures, citation checks, and no-evidence questions.
 
-## 3. Business Value
+Quiz results associated with a named employee are employee-related data. The MVP should use sample identities. Before real deployment, define access controls, data minimization, retention, and deletion rules for attempts and training overviews. The system must not present quiz scores as employment, legal, or compliance determinations.
 
-### Problem
+## 6. Reliability and Validation Requirements
 
-Learning materials are often fragmented across files and platforms. Traditional document search does not explain concepts well, while a standalone RAG chatbot cannot determine whether a learner is improving or which topic should be studied next.
-
-### Solution
-
-CloudMentor AI combines two data domains:
-
-1. **Knowledge data:** subjects, documents, chapters, topics, chunks, and embeddings.
-2. **Learning data:** quizzes, questions, answers, attempts, scores, and user activity.
-
-This combination allows the platform to provide:
-
-- Context-constrained answers with references that users can inspect.
-- Structured practice through Quiz activities.
-- Learning progress and weak-topic analytics.
-- Recommendations based on historical learning behavior.
-
-### Expected outcome
-
-When the complete roadmap is delivered, the system should be able to produce guidance such as:
-
-> You are currently weak in **Chapter 4 — Cloud Security**. Your three latest answers about **IAM** were incorrect. Review **Identity and Access Management**, then continue with the recommended basic Quiz.
-
-The project creates value by turning raw learning content and user activity into measurable learning decisions—not by adding tools for their own sake.
-
-## 4. Engineering Challenges & Solutions
-
-> [!NOTE]
-> At the current architecture stage, these are **design challenges and planned responses**. This section will later be replaced with problems actually encountered, evidence, and measured results from the implementation.
-
-| Engineering challenge | Planned solution | How it will be validated |
+| Risk | Target behavior | Validation evidence |
 |---|---|---|
-| Large document binaries should not travel through Kafka | Store the source file separately; publish `document_id`, `source_uri`, metadata, and processing context | Event payload inspection and upload/load testing |
-| PostgreSQL lifecycle and Chroma index may become inconsistent | Treat PostgreSQL as the system of record; make Chroma a rebuildable derived index; use dry-run-first, bounded reconciliation repair for safe drift classes | Failure injection, reconciliation audit/repair, delete, and rebuild tests |
-| Replayed events may create duplicate business effects | Use stable `event_id`, idempotent consumers, retry policy, and dead-letter handling | Replay the same event and verify one business outcome |
-| Metadata may be lost between pipeline stages | Define stage contracts and propagate `document_id`, `chunk_id`, subject, page, and source | Contract and lineage tests across the complete pipeline |
-| RAG answers may lack reliable evidence | Apply subject filters, retrieval thresholds, context-constrained prompting, and source serialization | Curated retrieval/answer evaluation set |
-| Machine Learning may be introduced before enough quality data exists | Build Quiz history, analytics, and versioned features before model training | Data readiness checks and baseline comparison |
-| Failures may be difficult to diagnose | Add lifecycle state, structured logs, metrics, correlation IDs, and alerts | Operational dashboards and failure-recovery exercises |
+| PostgreSQL and Chroma version state diverges | PostgreSQL allow-list prevents obsolete chunks from reaching answer context, even if stale Chroma metadata remains. | Index an old version, transition applicability, leave its vectors untouched, and verify retrieval cannot return them. Also cover failed indexing of a new version. |
+| New policy is only partially indexed | Do not activate the version until indexing and lineage checks pass. | Inject or simulate an indexing failure and verify the prior applicable version remains selected. |
+| Quiz answer is ambiguous or wrong | Only human-approved questions and answer keys are published. | Review generated or manually authored questions against their cited source versions before publication; grading uses the stored key. |
+| No eligible policy evidence exists | Return a controlled no-evidence response. | Ask unsupported questions and verify no unrelated or obsolete document is cited. |
+| Chroma filter syntax or semantics differ by version | Verify the production query path with the installed dependency and retain a safe allow-list enforcement path. | Focused integration/contract coverage for the actual metadata types and combined query filters. |
+| Employee result data is exposed too broadly | Restrict overview access and retain only necessary data before real identities are introduced. | Authorization checks and retention/deletion exercises before production use. |
 
-Actual implementation notes should eventually follow this format:
+Operational signals should include ingestion stage and outcome, version activation outcome, index verification, retrieval document IDs, citation lineage, quiz publication and grading outcomes, and reconciliation drift. Do not report a stage as healthy without evidence from its actual state.
 
-```text
-Problem -> Root cause -> Design decision -> Trade-off
-        -> Implementation -> Measured result -> Remaining limitation
-```
+## 7. Technology Boundaries
 
-## 5. Tech Stack Rationale
+| Technology | Target responsibility | Boundary |
+|---|---|---|
+| Python / FastAPI | Application and ingestion APIs | Keep routes thin and business rules in services. |
+| PostgreSQL | System of record for policies, versions, applicability, quizzes, answer keys, and training attempts | Owns business state and authoritative selection rules. |
+| Chroma | Derived vector search index | Never owns policy applicability or canonical document state; can be reconciled/rebuilt. |
+| Local / MinIO source storage | Canonical source bytes | Storage adapter boundary keeps processing independent of filesystem or object-store paths. |
+| Gemini / LLM provider | Evidence-constrained answer generation; optional future draft assistance | Does not own policy truth, version state, approved quiz keys, or grading. |
+| Kafka | Not in MVP | Add only when asynchronous processing has a measured workload or operational requirement. |
+| Spark | Not in MVP | Add only when data volume or latency needs justify distributed processing. |
+| Machine Learning | Not in MVP | No recommendations or employee scoring models before a justified, evaluated use case. |
 
-| Technology | Primary role | Why it fits | Boundary / trade-off | Status |
-|---|---|---|---|---|
-| **Python** | Pipeline and application language | Strong ecosystem for Data Engineering, RAG, and ML | Performance-critical workloads may need distributed or compiled components | Implemented baseline |
-| **FastAPI** | Backend API layer | Typed contracts, validation, and async-friendly APIs | API should remain thin; long processing belongs in workers | Implemented baseline |
-| **PostgreSQL** | Relational system of record | Transactions, constraints, joins, and canonical lifecycle state | Not the primary semantic vector-serving layer | Implemented baseline |
-| **Chroma** | Vector serving index | Simple embedding storage, similarity search, and metadata filtering | Derived index; not the source of truth for business data | Implemented baseline |
-| **MinIO** | Canonical source object-storage adapter | Stable object keys and S3-compatible byte access support retry and Chroma rebuild without filesystem-path coupling | Local recovery hardening distinguishes missing or changed sources from temporary unavailability; independent backups and production operations remain | Implemented local adapter, migration workflow, and recovery hardening |
-| **Kafka** | Event transport and streaming backbone | Decoupling, buffering, replay, partitioning, and consumer scaling | Adds operational complexity; only justified by real async/scale requirements | Planned |
-| **Spark** | Distributed batch/stream processing | Large-scale joins, aggregation, Structured Streaming, and feature engineering | Unnecessary overhead for small single-node workloads | Planned |
-| **Gemini** | Context-constrained answer generation | Generates natural-language answers from retrieved context | Does not own knowledge, lifecycle, or canonical data | Implemented baseline |
-| **Embedding model** | Semantic representation | Enables document/query similarity search | Requires evaluation and version tracking | Implemented baseline |
-| **Docker Compose** | Reproducible local environment | Simplifies multi-service development and onboarding | Compose configuration must reflect actual implemented services | Planned |
-
-### Core architecture decisions
-
-- **PostgreSQL is the system of record; Chroma is a derived serving index designed to be rebuildable once durable canonical content and an automated rebuild workflow exist.**
-- **Canonical source storage is selected behind one contract; application services consume source bytes rather than storage-specific paths or SDKs.**
-- **Cross-store repair is operator-controlled and dry-run-first: only orphan chunks and indexed documents with no chunks are eligible for explicit repair; ambiguous drift remains report-only.**
-- **Kafka transports events; it does not replace transactional storage.**
-- **Spark processes data; it does not serve application requests.**
-- **Gemini generates answers; retrieved context supplies the knowledge.**
-- **RAG, Quiz, Analytics, and ML are consumers of the same data platform.**
-- **Kafka, Spark, and ML are added only when latency, volume, complexity, or product value justifies them.**
-
-## 6. Delivery Phases
-
-Current setup and test instructions live in the repository [`README`](../README.md). Verified implementation status and evidence live in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md).
-
-### Delivery phases
+## 8. Delivery Phases
 
 | Phase | Status | Completion boundary |
-| --- | --- | --- |
-| Phase 1 — Core Data Foundation and RAG | Implemented baseline | Reproducible document upload → indexed state → scoped answer with source → delete; stable identity and stage contracts; automated coverage for the full local lifecycle. Manual verification is recorded separately. |
-| Phase 2 — Reliability and Multi-source Ingestion | Implemented local baseline | Retained canonical content; supported PDF/TXT/DOCX under one document contract; quality checks, safe retries, database-enforced concurrent-ingestion idempotency, cross-store reconciliation with bounded dry-run-first repair, tested delete/rebuild recovery, local-filesystem and MinIO adapters, dry-run-first migration of eligible retained local sources with read-back verification, and container-backed MinIO recovery tests plus a live local outage/retry exercise. Independent backups and production operations remain separate work. |
-| Phase 3 — Quiz and Learning Application | Planned | Users, quizzes, questions, attempts, answers, scores, and progress create complete, queryable learning records linked to their subject or topic. |
-| Phase 4 — Event-driven Processing with Kafka | Planned | A documented workload justifies asynchronous processing; versioned events can be replayed, consumers handle duplicates and failures, and upload latency or independent scaling is measured. |
-| Phase 5 — Distributed Analytics with Spark | Planned | Batch or streaming jobs produce validated curated datasets and versioned features with lineage; scale or latency benefit is measured against a simpler baseline. |
-| Phase 6 — Machine Learning and Personalization | Planned | Predictions or rankings are evaluated against a baseline, tied to data and model versions, and shown to improve a defined learning outcome before improvement is claimed. |
+|---|---|---|
+| Existing foundation — Document ingestion and RAG | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | Supported source upload, lifecycle, retained source, indexing, scoped retrieval, citations, and recovery evidence as recorded in project status. This baseline does not itself establish enterprise policy versioning or employee access control. |
+| MVP 1 — Policy versions and safe retrieval | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | PostgreSQL applicability rules select eligible document IDs using `effective_from` and exclusive `effective_until`; retrieval is constrained to those IDs; activation checks indexed-chunk consistency; source citations retain document lineage. Automated coverage and local end-to-end evidence are recorded in project status. |
+| MVP 2 — Reviewed onboarding quizzes | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | PostgreSQL stores quizzes, questions, options, attempts, and answers; quiz questions retain source document/version references; server-side grading uses stored answer keys and bounded scores. Quiz content is administered through the demo workflow; generated drafts must be reviewed before publication. |
+| MVP 3 — Onboarding experience | Implemented demo baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | The frontend provides separate training-admin and employee workspaces, policy lookup, quiz authoring/publication, employee quiz attempts/results, and training overview. This is a demo-level UI distinction, not authenticated or backend-enforced role authorization. |
+| Future — Authentication, authorization, and multi-company tenancy | Future, not MVP | Access is tenant- and role-scoped, with tested isolation before multiple companies or real employee data are supported. |
+| Future — Event processing and advanced analytics | Future, needs justification | Kafka, Spark, or additional analytics are introduced only for measured scale, latency, or product needs. |
 
-Phases are promoted from planned to implemented only when the corresponding code, tests, and reproducible evidence exist in the application repository.
-
----
-
-**CloudMentor AI is being developed toward an end-to-end learning data platform. Data Engineering forms the backbone, while RAG, Quiz, Analytics, and Machine Learning consume the data products it provides.**
+Promote a phase to implemented only when code, focused tests, and reproducible evidence exist. The current verified application capabilities and limitations belong in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md), not in this target document as unverified claims.

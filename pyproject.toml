@@ -49,4 +49,12 @@ python_files = [
   "test_live_retrieval.py",
   "test_chunking_ablation.py",
   "test_llm_service.py",
+  "test_date_utils.py",
+  "test_quiz_schemas.py",
+  "test_quiz_repository.py",
+  "test_quiz_authoring_service.py",
+  "test_quiz_grading_service.py",
+  "test_quiz_api.py",
+  "test_policy_version_service.py",
+  "test_policy_version_activation.py",
 ]

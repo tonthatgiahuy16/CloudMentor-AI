@@ -16,9 +16,16 @@ class Retriever:
         top_k: int = config.TOP_K,
         threshold: float = config.SIMILARITY_THRESHOLD,
         subject_id: str | None = None,
+        allowed_document_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero")
+        if allowed_document_ids is not None:
+            allowed_document_ids = list(
+                dict.fromkeys(allowed_document_ids)
+            )
+            if not allowed_document_ids:
+                return []
 
         embedding = (
             query_embedding.tolist()
@@ -31,6 +38,21 @@ class Retriever:
         }
         if subject_id is not None:
             query_options["where"] = {"subject_id": subject_id}
+        if allowed_document_ids is not None:
+            document_filter = {
+                "document_id": {
+                    "$in": allowed_document_ids,
+                },
+            }
+            if subject_id is None:
+                query_options["where"] = document_filter
+            else:
+                query_options["where"] = {
+                    "$and": [
+                        {"subject_id": subject_id},
+                        document_filter,
+                    ],
+                }
 
         results = self.collection.query(**query_options)
 

@@ -6,13 +6,13 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-10-28 |
-| Application baseline | `054f9396a71aa47ff29224cbbbf9e60a679eb19e` |
-| Current milestone | F01 deterministic chunk identity verified locally; F02 drift remediated locally; the report-only drift operator policy is documented |
-| Overall state | PDF, UTF-8 TXT, and body-paragraph DOCX share a path-independent storage and extraction contract; PostgreSQL remains the system of record and Chroma remains a rebuildable derived index. Versioned retrieval and answer-level evaluation baselines validate source fixtures, evidence coverage, human-reviewed answer correctness and faithfulness, and refusal behavior across TXT, DOCX, and PDF, including distractors. A local Phase 2.5 run exercised ingestion, validation, duplicate protection, retry, lifecycle recovery, reconciliation, controlled repair, and stale recovery. Its F02 local Chroma drift was remediated with a cleanup guard, and its F01 chunk-identity finding was remediated with deterministic UUID v5 generation and a separate local Trash and Restore verification. |
-| CI evidence | PR #45 passed four GitHub Actions checks. The application baseline was locally verified with `325 passed, 3 skipped, 1 warning`; the warning is the existing Starlette `TestClient` dependency deprecation warning. |
+| Snapshot date | 2026-11-09 |
+| Git baseline | The four MVP commits are present on `main`, from `a114b50` through `5ac4967`; this latest 439-test evidence update is not yet committed. |
+| Current milestone | MVP 1 policy versioning and date-aware retrieval, MVP 2 persisted onboarding quizzes, and MVP 3 demo workspaces are implemented in the current working tree. The Render configuration remains a constrained demo blueprint, not evidence of a deployed service. |
+| Overall state | PostgreSQL remains the system of record and Chroma a rebuildable derived index. Policy documents use `effective_from` and exclusive `effective_until` dates; RAG selects eligible document IDs before vector retrieval. Quiz definitions, questions, options, attempts, and answers are stored in PostgreSQL, with server-side grading and question source-version references. The frontend provides separate training-admin and employee demo workspaces. No authenticated identity or backend-enforced role authorization exists. |
+| Local verification | **User-reported:** after adding `test_date_utils.py` to pytest's explicit discovery list, the backend suite completed with `439 passed, 3 skipped, 1 warning in 7.79s`. Frontend lint and production build passed in a separate local run. The configured PostgreSQL database reports Alembic revision `c4f1a9b2d7e5` as head. User-reported manual end-to-end testing of the demo flows was generally successful. These checks do not establish a production deployment or production readiness. |
 
-This status reflects the application baseline at `054f9396a71aa47ff29224cbbbf9e60a679eb19e`. The Phase 2.5 local evidence run and its post-evidence F01 and F02 remediation records are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
+The four MVP commits on `main` contain the policy, quiz, and onboarding implementation described in this snapshot. The latest user-reported 439-test verification is recorded here but is not yet committed. The historical Phase 2.5 baseline and its post-evidence F01 and F02 remediation records are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
 
 Report-only reconciliation drift is governed by [`RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md`](./RECONCILIATION_REPORT_ONLY_DRIFT_POLICY.md). The policy requires an operator-reviewed snapshot and exact-ID manifest; it does not add automatic cleanup.
 
@@ -60,26 +60,35 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | MinIO recovery failure handling | Implemented and automatically covered | Missing objects and checksum mismatches mark the document failed before derived-vector deletion; temporary S3, connection, and stream-read failures become `SourceUnavailableError`, leave the document unchanged, and can be retried through subject restore |
 | Format-aware extraction and cleaning | Implemented | PDF pages, TXT lines, and DOCX body paragraphs retain their source boundaries through transform tests; DOCX manual line breaks are normalized inside their owning paragraph |
 | Source-location contract | Implemented | `Document`, `Chunk`, Chroma metadata, chat schemas, and frontend rendering require exactly one of page, line range, or paragraph range |
-| Overlapping chunk generation | Implemented | Chunk boundaries, overlap, indices, and page/line/paragraph metadata are automatically covered |
+| Format-aware chunk generation | Implemented | PDF and TXT retain their existing overlapping chunk behavior; DOCX now chunks at paragraph boundaries, splitting only a paragraph that exceeds the configured size. Chunk boundaries, overlap, indices, and page/line/paragraph metadata are automatically covered |
 | PostgreSQL document lifecycle | Implemented | `UPLOADED`, `PROCESSING`, `INDEXED`, `FAILED`, and `DELETED` states plus processing attempts, heartbeat, and stage metadata |
 | Duplicate-safe ingestion and failed retry | Implemented with database concurrency protection | A partial unique PostgreSQL index rejects concurrent active documents with the same subject and content SHA-256; a reservation is created before source storage writes, while failed retries reuse retained source and document identity |
 | Stale-ingestion recovery | Implemented operator workflow | Stale selection, processing heartbeat, dry-run/apply CLI, failure handling, and automated tests |
 | Subject metadata propagation | Implemented | Metadata flows through document, chunk, vector, retrieval, and chat layers |
 | Subject-scoped retrieval | Implemented | Retriever and chat orchestration tests plus live local verification |
+| Policy effective windows and date-aware RAG | Implemented in current working tree | `effective_from` and exclusive `effective_until` are stored in PostgreSQL; business-date handling and eligible-document filtering constrain retrieval, with version-aware citations. Migration: `7a2d5f1c9b31`. |
+| Onboarding quiz authoring, publication, and grading | Implemented in current working tree | PostgreSQL quiz, question, option, attempt, and answer tables; published quizzes use stored answer keys; server-side grading and score bounds are tested. Migration: `c4f1a9b2d7e5`. |
+| Quiz source lineage | Implemented in current working tree | Questions can retain `source_document_id` and `source_document_version`; quiz API and frontend expose source context. |
+| Employee and training-admin demo workspaces | Implemented as demo UI in current working tree | Frontend includes policy lookup, quiz authoring/overview, employee quiz, and personal results flows. Workspace selection is not authentication or backend authorization. |
 | Answer and source rendering | Implemented | Frontend renders context-constrained answers with document plus page, line-range, or paragraph-range references |
 | Document deletion | Implemented and automatically covered | PDF, TXT, and DOCX lifecycle tests verify Chroma removal, PostgreSQL `DELETED` state, and post-delete retrieval behavior |
 | Retained-source Chroma rebuild | Implemented through subject restore | Automated multi-format and failure-path rebuild tests plus live local-filesystem and MinIO cycles preserve source identity and lineage; the MinIO cycle rebuilt 14 TXT/DOCX/PDF chunks and preserved format-aware citations, and a live outage retry rebuilt the same document without duplicate vectors |
 | Guarded legacy-source repair | Implemented operator workflow | Dry-run-first CLI, checksum and size verification, conflict protection, idempotent rerun tests, and live recovery evidence |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Controlled PostgreSQL-Chroma reconciliation repair | Implemented operator workflow | Default audit and `--repair` are dry runs; `--repair --apply` deletes orphan chunks and rebuilds active indexed documents with no chunks, logs each outcome, isolates per-action failure, and is safe to rerun; missing lineage, known non-expected documents, and subject mismatches remain report-only |
-| Retrieval-evaluation baseline | Implemented locally | A versioned four-case TXT/DOCX/PDF dataset, three distractors, fixture/evidence validation, evidence-coverage scoring, a CLI, and automated tests. Manual subject-scoped retrieval returned expected evidence for 3/3 answerable cases; the unanswerable case still returned context. |
-| Answer-quality and faithfulness baseline | Implemented locally | Human-reviewed answer correctness, faithfulness, and refusal labels are combined with automated citation-coverage scoring from source lineage. A CLI aggregates the results; the narrow live baseline scored 3/3 answerable cases and 1/1 appropriate refusal. |
-| Production operations | Not implemented | A local MinIO adapter exists, but independent backups, authentication, authorization, monitoring, and deployment remain out of scope |
+| Retrieval-evaluation baseline | Implemented locally and expanded | A versioned 14-case TXT/DOCX/PDF dataset, three distractors, bilingual lineage and anchor queries, fixture/evidence validation, evidence-coverage scoring, live-retrieval and chunking-ablation CLIs, and automated tests. **User-reported local evidence:** the paragraph-aware layout returned expected evidence for 11/11 answerable cases; raw retrieval still returned results for 2/3 unanswerable cases. |
+| Answer-quality and faithfulness baseline | Implemented locally | Human-reviewed answer correctness, faithfulness, and refusal labels are combined with automated citation-coverage scoring from source lineage. The original narrow live baseline scored 3/3 answerable cases and 1/1 appropriate refusal; a later unanswerable-only run produced 3/3 correct refusals. Broader answer quality remains unmeasured. |
+| Gemini provider resilience | Implemented and automatically covered | The service retries transient Google SDK `429` and `503` errors plus timeout errors with bounded exponential backoff; retry exhaustion maps to a controlled `503`, other provider errors to `502`. No circuit breaker or provider fallback exists. |
+| Controlled public-demo configuration | Implemented, not deployed | Dockerfile, Render Blueprint, persistent-disk paths, CORS allow-listing, `/healthz`, dependency-checking `/readyz`, demo-mode mutation blocking, token-protected seed, and an in-memory chat limit are present. It remains a one-instance demo design, not production operations. |
+| Production operations | Not implemented | Independent backups, authentication, authorization, shared/distributed rate limiting, monitoring, alerting, and an active deployment remain out of scope |
 
 ## Verification evidence
 
 ### Automated
 
+- **User-reported verification on 2026-11-09:** after `test_date_utils.py` was added to the explicit `python_files` list, the backend suite completed with `439 passed, 3 skipped, 1 warning in 7.79s`. The three skipped cases are the opt-in MinIO and PostgreSQL integration tests (two MinIO cases and one PostgreSQL concurrency case); the warning is the existing Starlette `TestClient` dependency deprecation. Frontend `npm run lint` and `npm run build` passed in a separate local run. The configured PostgreSQL database reported Alembic head `c4f1a9b2d7e5`. These are local checks, not CI or a deployment check.
+- **User-reported evidence:** the full backend suite passed with `344 passed, 3 skipped, 1 warning in 5.48s` after the merged paragraph-aware DOCX chunking, retrieval-evaluation, and Gemini-resilience changes. The run used a project-local pytest base temporary directory to avoid the inaccessible default Windows temp root.
+- PR #49 passed all four GitHub Actions checks after the unit-test job was updated to install the Gemini SDK required by the new resilience tests. The workflow still runs unit tests, frontend lint/build, MinIO recovery integration, and PostgreSQL concurrent-ingestion integration as separate jobs.
 - The full backend suite passed locally against retrieval-evaluation feature commit `061224df9259d4d96c7c2a14546789ee3b86b5c1` with `313 passed, 3 skipped` and one existing Starlette `TestClient` dependency deprecation warning. The local run used a project-local pytest temporary directory because the default Windows pytest temp root was inaccessible.
 - The full backend suite passed locally against answer-evaluation feature commit `f67f448` with `320 passed, 3 skipped` and the same existing warning. This run also used a project-local pytest temporary directory.
 - The full backend suite passed locally against F02 prevention commit `d964367574166c50921932c11127957081e260b5` with `322 passed, 3 skipped`, and one existing warning. Focused PDF-service and lifecycle regression scopes also passed.
@@ -94,6 +103,8 @@ A live local recovery was verified on 2026-10-17 against the application state m
 - CI still does not run live PostgreSQL, Chroma, embedding, and Gemini together as one external integration workflow.
 
 ### Manual local end-to-end
+
+**User-reported demo verification on 2026-11-09:** policy lookup returned an answer with three source excerpts, and the employee results screen displayed a completed quiz attempt and score. The user reported the end-to-end demo was generally successful. This was not a separately recorded reproducible test run, and it does not verify authentication or production deployment.
 
 Verified on 2026-10-26 on `feat/rag-evaluation-baseline`; the evaluated changes were subsequently committed as `061224df9259d4d96c7c2a14546789ee3b86b5c1`:
 
@@ -229,18 +240,20 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - The local F02 remediation snapshotted and removed 337 report-only derived chunks, after which the audit reported consistent stores. Future report-only drift remains manual and must follow the documented snapshot, classification, review, exact-ID manifest, apply, and verification procedure; the application does not automate this cleanup.
 - Legacy documents without source metadata still require the operator to locate and supply the correct original source file.
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
-- A small retrieval and answer-level evaluation baseline exists, but it contains only four cases. Answer correctness, faithfulness, and refusal are human-reviewed; broader retrieval relevance and answer quality are not yet benchmarked.
+- The retrieval benchmark contains 14 cases, but its live retrieval evidence remains a local, small-fixture evaluation: 11 answerable cases, three unanswerable cases, and three distractors. Answer correctness, faithfulness, and refusal are still human-reviewed; broader relevance and answer quality are unbenchmarked.
 - CI does not run live PostgreSQL, Chroma, embedding, and Gemini as one integration workflow.
-- Dedicated health and readiness endpoints are not implemented.
 - Structured operational logging, metrics, tracing, and alerting are incomplete.
-- Authentication, authorization, rate limiting, and production deployment are not implemented.
+- Authentication and authorization are not implemented. Chat rate limiting is process-local, so it is not sufficient for a horizontally scaled deployment.
+- `/healthz` and dependency-checking `/readyz` exist, but they are not monitoring, alerting, or proof of a deployed service.
+- A constrained Render demo configuration exists, but no active deployment is established. Its persistent disk is not an independent backup, and the token-protected demo seed requires operator handling.
+- Gemini retries only `429`, `503`, and timeout failures. There is no circuit breaker, provider fallback, retry jitter, or persisted checkpoint/cache for batch answer evaluation.
 
 ## Next milestone priorities
 
 1. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
-2. Add metrics, structured logs, tracing, and health/readiness endpoints for ingestion, storage, and reconciliation operations.
-3. Add authentication, authorization, and rate limiting before private beta.
-4. Expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
+2. Add metrics, structured logs, tracing, and alerting for ingestion, storage, retrieval, Gemini calls, and reconciliation; health/readiness probes already exist.
+3. Add authentication, authorization, and shared rate limiting before private beta or any multi-instance deployment.
+4. Add checkpoint/cache behavior to batch answer evaluation, then expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 
 ## Update policy
 

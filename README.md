@@ -2,15 +2,15 @@
 
 [![Tests](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml/badge.svg)](https://github.com/tonthatgiahuy16/CloudMentor-AI/actions/workflows/tests.yml)
 
-> A document-data platform for subject-scoped RAG, built around traceable ingestion, PostgreSQL lifecycle management, and a Chroma vector index designed to be rebuildable.
+> An Enterprise Policy and Onboarding Platform built around traceable policy ingestion, effective-dated retrieval, and reviewed employee training.
 
-CloudMentor AI is a data engineering-focused project that explores how learning documents can be converted into structured, traceable data for retrieval and LLM-based applications.
+CloudMentor AI helps employees look up answers grounded in company policies and helps training owners create reviewed onboarding quizzes and inspect training outcomes. Its current MVP is a single-company demo with sample identities and data; it is not a production HR or legal-compliance system.
 
-Data Engineering is the backbone of the project. The main concerns are ingestion, metadata propagation, lifecycle state, data ownership, retrieval boundaries, validation, and recovery. RAG and the frontend consume the data produced by that backbone.
+Data Engineering is the backbone: PostgreSQL owns policy versions, quiz content, and attempts; Chroma is a derived retrieval index. RAG and the frontend consume data from that pipeline.
 
 ## Current milestone
 
-CloudMentor AI currently implements a recoverable, subject-scoped RAG lifecycle for PDF, UTF-8 TXT, and body-paragraph DOCX sources with configurable local-filesystem or MinIO source storage:
+The current working tree implements three MVP slices: effective-dated policy retrieval, persisted onboarding quizzes with server-side grading and source lineage, and separate employee/training-admin demo workspaces. The policy pipeline supports PDF, UTF-8 TXT, and body-paragraph DOCX with configurable local-filesystem or MinIO source storage:
 
 ```text
 create subject
@@ -19,9 +19,12 @@ create subject
     -> extract, clean, and preserve page, line, or paragraph locations
     -> chunk, embed, and index with source lineage
     -> track processing and document lifecycle in PostgreSQL
-    -> ask a subject-scoped question
-    -> return an answer constrained by retrieved context
+    -> select documents applicable on the requested business date
+    -> ask a subject-scoped policy question
+    -> return an answer constrained by eligible retrieved context
     -> show document plus page, line-range, or paragraph-range references
+    -> create and review quiz questions against a source document/version
+    -> publish approved quiz content -> record and server-grade employee attempts
     -> delete a document from active retrieval
        or move a subject to Trash
            -> remove its derived Chroma vectors
@@ -29,17 +32,17 @@ create subject
            -> restore the subject by rebuilding Chroma
 ```
 
-The lifecycle is covered by automated application-level tests and recorded live local verification. Deterministic test doubles replace external embedding and answer generation in the application-level lifecycle test, and CI does not yet exercise live PostgreSQL, Chroma, embedding, and Gemini as one workflow. MinIO recovery hardening verifies missing-source and checksum-mismatch handling before vector deletion, translates temporary storage failures at the adapter boundary, and records a live local outage followed by successful restore retry. PostgreSQL-Chroma reconciliation is dry-run-first and can explicitly repair orphan vectors or rebuild an `INDEXED` document with no derived vectors. The current baseline, exact evidence, and remaining limitations are maintained in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). The project does not claim production readiness: independent backups are not established, some legacy rows lack complete source metadata, and several operational and security boundaries remain.
+The user reported generally successful manual end-to-end testing of policy lookup and quiz results. After `test_date_utils.py` was added to pytest's explicit discovery list, the backend suite completed with `439 passed, 3 skipped, 1 warning in 7.79s` (user-reported). Frontend lint and production build passed in a separate local run. Three optional MinIO/PostgreSQL integration cases were skipped. CI does not exercise live PostgreSQL, Chroma, embeddings, and Gemini together as one workflow. See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for evidence and limitations. This project does not claim production readiness: authentication, backend authorization, tenant isolation, independent backups, monitoring, and alerting are not established.
 
 ## Local reproducible demo
 
-CloudMentor includes a constrained local demo mode for portfolio evidence. It seeds four public Data Engineering learning sources, keeps the normal source-grounded chat flow available, and blocks public state-changing routes. The seed route requires a temporary token; the public demo UI does not expose upload, create, delete, or restore controls.
+CloudMentor includes a constrained demo mode. The current seed manifest loads four Data Engineering learning sources; `sample_onboarding_policy_2026.txt` is present but is not yet in that manifest. In `DEMO_MODE=true`, state-changing routes—including quiz creation and attempts—are blocked. Therefore the current Render blueprint can demonstrate read-only policy chat after seeding, but not interactive onboarding quizzes. The local app can exercise the quiz flows. See [`docs/RENDER_PUBLIC_DEMO.md`](docs/RENDER_PUBLIC_DEMO.md) before using the deployment blueprint.
 
-The current local evidence was verified on 2026-11-02 at `main` commit `d3ce6b3`: `331 passed, 3 skipped, 1 warning` for the backend suite, with frontend ESLint and the production TypeScript/Vite build also passing. This is local verification, not a deployed public-service claim.
+The screenshots below show the current onboarding demo experience: policy answers with visible source lineage, and an employee's quiz results.
 
-![Local demo library with four seeded and indexed Data Engineering sources](docs/assets/cloudmentor-demo-library.png)
+![Employee policy lookup with cited policy excerpts and source locations](docs/assets/policy-lookup-lineage.png)
 
-![Local demo answer grounded in seeded sources with chunk-level references](docs/assets/cloudmentor-demo-chat.png)
+![Employee onboarding quiz results with score and per-question review](docs/assets/onboarding-quiz-results.png)
 
 The optional Render configuration remains a costed deployment path. It is not active deployment evidence; see [`docs/RENDER_PUBLIC_DEMO.md`](docs/RENDER_PUBLIC_DEMO.md) for its operational boundaries.
 
@@ -64,14 +67,14 @@ The optional Render configuration remains a costed deployment path. It is not ac
 
 | Layer | Technology | Role |
 | --- | --- | --- |
-| API | FastAPI | Upload, document, subject, and chat endpoints |
-| Relational storage | PostgreSQL + SQLAlchemy | Document metadata and lifecycle state |
+| API | FastAPI | Policy, document, subject, chat, quiz, and attempt endpoints |
+| Relational storage | PostgreSQL + SQLAlchemy | Policy versions, document lifecycle, quizzes, answer keys, and attempts |
 | Source extraction | pypdf, UTF-8 text loading, python-docx | PDF pages, TXT lines, and DOCX body paragraphs |
 | Source files | Local filesystem or MinIO through a shared storage contract | Canonical source retention for retry and rebuild |
 | Embeddings | BGE-M3 | Document and query vector generation |
 | Vector index | Chroma | Similarity search over derived chunk embeddings |
 | Generation | Gemini | Answer generation from retrieved context with bounded retry for transient provider failures |
-| Frontend | React + TypeScript + Vite | Document library, upload, subject management, and chat |
+| Frontend | React + TypeScript + Vite | Training-admin policy/quiz workspace and employee policy/quiz/results workspace |
 | Quality checks | Pytest, ESLint, TypeScript, GitHub Actions | Regression and build validation |
 
 ## Data flow
@@ -93,9 +96,10 @@ PDF, UTF-8 TXT, or body-paragraph DOCX upload
 Pipeline failure
     -> record FAILED status, failure stage, and error details
 
-Question + required subject_id
+Question + required subject_id + business date
+    -> resolve applicable document IDs from PostgreSQL effective windows
     -> embed question
-    -> retrieve matching chunks filtered by subject
+    -> retrieve matching chunks filtered by subject and eligible document IDs
     -> generate an answer constrained by retrieved context
     -> retry transient Gemini `429`, `503`, or timeout failures with exponential backoff
     -> return controlled `502` or `503` when the provider cannot complete the request
@@ -121,9 +125,13 @@ flowchart LR
     API --> UPLOAD[Upload service]
     API --> CHAT[Chat service]
     API --> DOCS[Document service]
+    API --> VERSIONS[Policy version service]
+    API --> QUIZZES[Quiz authoring and grading]
 
     SUBJECTS --> PG[(PostgreSQL\nmetadata + lifecycle)]
     DOCS --> PG
+    VERSIONS --> PG
+    QUIZZES --> PG
     UPLOAD --> STORAGE[Source-storage boundary]
     STORAGE --> FILES[(LocalSourceStorage\nretained PDF / TXT / DOCX)]
     STORAGE --> MINIO[(MinioSourceStorage\nretained objects)]
@@ -134,6 +142,7 @@ flowchart LR
     UPLOAD --> PG
 
     CHAT --> CHROMA
+    VERSIONS --> CHAT
     CHAT --> LLM[Gemini]
     CHAT --> UI
 ```
@@ -147,6 +156,7 @@ Canonical sources are written and read through a shared storage interface implem
 | Subject, document metadata, and lifecycle state | PostgreSQL | System of record for operational state |
 | Accepted PDF, TXT, and DOCX sources | Configured `LocalSourceStorage` or `MinioSourceStorage` | Retained for retry and rebuild; MinIO is currently operated as a local service rather than independently backed-up production storage |
 | Chunk embeddings and retrieval metadata | Chroma | Derived index used for retrieval |
+| Policy applicability, quiz definitions, answer keys, attempts, and answers | PostgreSQL | Authoritative business and training records |
 | Generated answer | API response | Not currently treated as a durable record |
 
 PostgreSQL is the system of record for document identity, source metadata, and lifecycle state. Chroma is a derived retrieval index. Subject restore can rebuild Chroma from canonical bytes read through either storage adapter while preserving `document_id`, and the reconciliation audit can report drift between PostgreSQL and Chroma.
@@ -206,7 +216,16 @@ The chat API returns document and format-aware location references alongside the
 | `DELETE` | `/documents/{document_id}` | Remove a document from active use |
 | `POST` | `/chat/` | Ask a question and receive answer plus sources |
 
-`GET /` is an API root message, not a health check. Dedicated health and readiness endpoints have not yet been implemented.
+| `POST` | `/documents/{document_id}/activate` | Activate a verified policy version with an effective date |
+| `POST` | `/quizzes/` | Create a quiz |
+| `POST` | `/quizzes/{quiz_id}/questions` | Add a question and source-version reference |
+| `POST` | `/quizzes/{quiz_id}/publish` | Publish a reviewed quiz |
+| `GET` | `/quizzes/?subject_id=...` | List published quizzes |
+| `POST` | `/quizzes/{quiz_id}/attempts` | Start an employee attempt |
+| `POST` | `/quizzes/attempts/{attempt_id}/submit` | Submit answers for server-side grading |
+| `GET` | `/healthz`, `/readyz` | Liveness and dependency readiness checks |
+
+`GET /` is an API root message, not a health check. The dedicated health and readiness endpoints are `/healthz` and `/readyz`. In demo mode, public mutation routes are blocked; quiz authoring and attempt submissions are available in local development, not the current Render read-only blueprint.
 
 Interactive API documentation is available at `http://127.0.0.1:8000/docs` while the backend is running.
 
@@ -219,6 +238,9 @@ Interactive API documentation is available at `http://127.0.0.1:8000/docs` while
 - Select a subject before asking a question.
 - Move subjects to Trash and restore them from retained sources.
 - Render the answer and its document plus page, line-range, or paragraph-range references.
+- Activate policy versions with effective dates and inspect current policy status.
+- Create and review onboarding quizzes, complete employee attempts, and inspect results in the local demo.
+- Switch between training-admin and employee demo workspaces. This is a UI distinction only; authentication and backend role authorization are future work.
 
 ## Verification status
 

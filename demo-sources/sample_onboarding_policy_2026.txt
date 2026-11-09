@@ -1,0 +1,34 @@
+CÔNG TY CỔ PHẦN CÔNG NGHỆ CLOUDMENTOR
+VĂN BẢN QUY ĐỊNH NỘI BỘ VÀ HƯỚNG DẪN HÒA NHẬP (ONBOARDING) NĂM 2026
+Mã tài liệu: CM-POL-2026-v1
+Phiên bản: 1.0 — Có hiệu lực từ ngày: 2026-01-01
+
+CHƯƠNG I: THỜI GIAN LÀM VIỆC VÀ CHẾ ĐỘ HYBRID (KẾT HỢP TRỰC TIẾP VÀ TỪ XA)
+Điều 1. Khung giờ làm việc tiêu chuẩn:
+Khung giờ làm việc chính thức của toàn thể nhân viên là từ 08:30 đến 17:30 các ngày từ Thứ Hai đến Thứ Sáu (nghỉ trưa từ 12:00 đến 13:00). Nhân viên có thể linh hoạt đến sớm hoặc muộn tối đa 30 phút (từ 08:00 đến 09:00), miễn đảm bảo đủ 8 giờ làm việc tiêu chuẩn mỗi ngày.
+
+Điều 2. Chế độ làm việc kết hợp (Hybrid Work):
+Sau khi hoàn thành thời gian thử việc 02 tháng, nhân viên chính thức được phép đăng ký làm việc từ xa (Work From Home) tối đa 02 ngày mỗi tuần, với điều kiện phải thông báo cho quản lý trực tiếp trước 18:00 của ngày liền trước và đảm bảo duy trì kết nối mạng thông suốt qua kênh liên lạc nội bộ.
+
+CHƯƠNG II: CHẾ ĐỘ NGHỈ PHÉP VÀ THÔNG BÁO NGHỈ
+Điều 3. Quỹ ngày phép năm (Annual Leave):
+Mỗi nhân viên chính thức được hưởng 12 ngày phép năm có hưởng lương cho 12 tháng làm việc. Cứ mỗi 05 năm thâm niên làm việc liên tục tại công ty, nhân viên được cộng thêm 01 ngày phép năm.
+
+Điều 4. Quy trình xin nghỉ phép và thời hạn báo trước:
+- Đối với trường hợp nghỉ từ 01 đến dưới 03 ngày làm việc: Nhân viên phải gửi đơn đề nghị trên cổng thông tin nội bộ trước ít nhất 24 giờ.
+- Đối với trường hợp nghỉ từ 03 ngày làm việc liên tiếp trở lên: Nhân viên bắt buộc phải gửi đơn xin phép và được quản lý trực tiếp phê duyệt trước ít nhất 03 ngày làm việc để kịp thời sắp xếp bàn giao công việc.
+- Trường hợp nghỉ ốm đột xuất: Nhân viên phải nhắn tin thông báo cho quản lý trước 08:30 của ngày nghỉ và nộp giấy khám bệnh của cơ sở y tế hợp lệ trong vòng 48 giờ sau khi đi làm lại.
+
+CHƯƠNG III: BẢO MẬT THÔNG TIN VÀ QUẢN LÝ THIẾT BỊ
+Điều 5. Quy định về tài khoản và mật khẩu:
+Nhân viên bắt buộc phải kích hoạt xác thực hai yếu tố (2FA - Two-factor Authentication) trên tất cả các tài nguyên của doanh nghiệp (Email, VPN, Git, Cổng quản trị). Mật khẩu truy cập phải có độ dài tối thiểu 12 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt, và phải được đổi định kỳ 90 ngày một lần. Tuyệt đối không chia sẻ mật khẩu cho bất kỳ ai, kể cả nhân sự IT.
+
+Điều 6. Quản lý dữ liệu và thiết bị làm việc:
+Tất cả mã nguồn, tài liệu dự án và dữ liệu của khách hàng là tài sản thuộc quyền sở hữu độc quyền của công ty. Nhân viên không được phép sao chép dữ liệu công việc ra thiết bị cá nhân hoặc tải lên các nền tảng lưu trữ đám mây công cộng chưa được phê duyệt. Khi rời khỏi vị trí làm việc, nhân viên phải luôn khóa màn hình máy tính (sử dụng tổ hợp phím Windows + L hoặc Command + Control + Q).
+
+CHƯƠNG IV: QUY TRÌNH HỖ TRỢ KỸ THUẬT VÀ BÁO CÁO SỰ CỐ
+Điều 7. Kênh tiếp nhận hỗ trợ IT:
+Mọi yêu cầu cấp quyền truy cập, cài đặt phần mềm hoặc cấp phát thiết bị phải được gửi qua cổng tiếp nhận sự cố kỹ thuật (IT Helpdesk) tại địa chỉ nội bộ https://helpdesk.cloudmentor.local. Nhân viên không nhắn tin riêng để yêu cầu cấp quyền ngoại lệ.
+
+Điều 8. Báo cáo sự cố an ninh mạng (Security Incident):
+Khi phát hiện máy tính có dấu hiệu nhiễm mã độc, nhận được email lừa đảo (phishing), hoặc nghi ngờ thông tin xác thực bị lộ, nhân viên có nghĩa vụ ngắt kết nối mạng ngay lập tức và gọi vào đường dây nóng của Đội Ứng cứu Sự cố An ninh (CSIRT) tại số máy nhánh nội bộ 8888 trong vòng tối đa 15 phút.
