@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from tests.auth_stubs import override_auth
 from sqlalchemy.exc import IntegrityError
 from unittest.mock import Mock
 from app.api.subjects import (
@@ -122,6 +124,8 @@ def make_client(
     app.dependency_overrides[
         get_subject_restore_service
     ] = lambda: restore_service
+
+    override_auth(app)
 
     return TestClient(app)
 

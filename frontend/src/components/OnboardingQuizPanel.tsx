@@ -16,6 +16,7 @@ import {
   removeDraftQuizSession,
   saveDraftQuizSession,
 } from '../services/onboardingStore'
+import { getIdentity } from '../services/auth'
 import type { DocumentRecord } from '../types/document'
 import type {
   AttemptResult,
@@ -92,7 +93,6 @@ function OnboardingQuizPanel({
   const [isLoadingQuizDetail, setIsLoadingQuizDetail] = useState(false)
 
   // Employee Quiz-taking state
-  const [employeeId, setEmployeeId] = useState('')
   const [selectedOptionMap, setSelectedOptionMap] = useState<
     Record<string, string>
   >({})
@@ -250,12 +250,6 @@ function OnboardingQuizPanel({
 
     if (!activeQuiz) return
 
-    const trimmedEmployee = employeeId.trim()
-    if (!trimmedEmployee) {
-      setTakeError('Vui lòng nhập Mã nhân viên hoặc Họ tên trước khi nộp bài.')
-      return
-    }
-
     const unansweredCount = activeQuiz.questions.filter(
       (q) => !selectedOptionMap[q.question_id],
     ).length
@@ -273,7 +267,6 @@ function OnboardingQuizPanel({
     try {
       const attemptStart = await startQuizAttempt(
         activeQuiz.quiz_id,
-        trimmedEmployee,
       )
       const answersPayload = activeQuiz.questions.map((question) => ({
         question_id: question.question_id,
@@ -717,16 +710,12 @@ function OnboardingQuizPanel({
           })() : (
             <form className="quiz-take-form" onSubmit={(e) => void handleSubmitAttempt(e)}>
               <div className="quiz-employee-bar">
-                <label className="field" htmlFor="employee-identifier">
-                  <span>Mã nhân viên / Họ và tên người làm bài</span>
-                  <input
-                    id="employee-identifier"
-                    type="text"
-                    placeholder="VD: NV-2026-018 — Nguyễn Văn An (Product Engineer)"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                  />
-                </label>
+                <div className="field">
+                  <span>Người làm bài</span>
+                  <strong>
+                    {getIdentity()?.employee_id ?? 'Phiên đăng nhập hiện tại'}
+                  </strong>
+                </div>
                 <div className="quiz-progress-box">
                   <span>Tiến độ trả lời</span>
                   <strong>

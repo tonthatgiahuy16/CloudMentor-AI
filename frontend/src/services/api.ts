@@ -5,6 +5,8 @@ import type {
   UploadDocumentInput,
   UploadDocumentResult,
 } from '../types/document'
+import { API_BASE_URL } from './apiConfig'
+import { getAccessToken } from './auth'
 
 import type {
   DeleteSubjectResult,
@@ -27,8 +29,22 @@ import type {
   QuizSummary,
 } from '../types/quiz'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+async function authenticatedFetch(
+  input: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const token = getAccessToken()
+  const headers = new Headers(init.headers)
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  return fetch(input, {
+    ...init,
+    headers,
+  })
+}
 
 async function getErrorMessage(
   response: Response,
@@ -79,7 +95,7 @@ async function getErrorMessage(
 }
 
 export async function getDocuments(): Promise<DocumentRecord[]> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/documents/`,
   )
 
@@ -98,7 +114,7 @@ export async function getDocuments(): Promise<DocumentRecord[]> {
 export async function activatePolicyVersion(
   input: ActivatePolicyVersionInput,
 ): Promise<DocumentRecord> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/documents/${encodeURIComponent(input.documentId)}/activate`,
     {
       method: 'POST',
@@ -125,7 +141,7 @@ export async function activatePolicyVersion(
 }
 
 export async function getSubjects(): Promise<SubjectRecord[]> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/subjects/`,
   )
 
@@ -144,7 +160,7 @@ export async function getSubjects(): Promise<SubjectRecord[]> {
 export async function getSubjectTrash(): Promise<
   SubjectTrashRecord[]
 > {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/subjects/trash`,
   )
 
@@ -163,7 +179,7 @@ export async function getSubjectTrash(): Promise<
 export async function createSubject(
   name: string,
 ): Promise<SubjectRecord> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/subjects/`,
     {
       method: 'POST',
@@ -189,7 +205,7 @@ export async function createSubject(
 export async function deleteSubject(
   subjectId: string,
 ): Promise<DeleteSubjectResult> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/subjects/${encodeURIComponent(subjectId)}`,
     {
       method: 'DELETE',
@@ -211,7 +227,7 @@ export async function deleteSubject(
 export async function restoreSubject(
   subjectId: string,
 ): Promise<RestoreSubjectResult> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/subjects/${encodeURIComponent(subjectId)}/restore`,
     {
       method: 'POST',
@@ -242,7 +258,7 @@ export async function uploadDocument(
     formData.append('chapter', String(input.chapter))
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/upload/`,
     {
       method: 'POST',
@@ -279,7 +295,7 @@ export async function uploadDocument(
 export async function deleteDocument(
   documentId: string,
 ): Promise<DeleteDocumentResult> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/documents/${encodeURIComponent(documentId)}`,
     {
       method: 'DELETE',
@@ -302,7 +318,7 @@ export async function askQuestion(
   question: string,
   subjectId: string,
 ): Promise<ChatResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/chat/`,
     {
       method: 'POST',
@@ -331,7 +347,7 @@ export async function askQuestion(
 export async function getPublishedQuizzes(
   subjectId: string,
 ): Promise<QuizSummary[]> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/?subject_id=${encodeURIComponent(subjectId)}`,
   )
 
@@ -350,7 +366,7 @@ export async function getPublishedQuizzes(
 export async function getPublishedQuizDetail(
   quizId: string,
 ): Promise<QuizPublic> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}`,
   )
 
@@ -370,7 +386,7 @@ export async function createDraftQuiz(
   subjectId: string,
   title: string,
 ): Promise<QuizCreateResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/`,
     {
       method: 'POST',
@@ -400,7 +416,7 @@ export async function addQuestionToQuiz(
   quizId: string,
   payload: QuizQuestionCreateInput,
 ): Promise<QuizQuestionPublic> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/questions`,
     {
       method: 'POST',
@@ -426,7 +442,7 @@ export async function addQuestionToQuiz(
 export async function publishDraftQuiz(
   quizId: string,
 ): Promise<QuizPublishResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/publish`,
     {
       method: 'POST',
@@ -447,18 +463,11 @@ export async function publishDraftQuiz(
 
 export async function startQuizAttempt(
   quizId: string,
-  employeeId: string,
 ): Promise<AttemptStartResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/attempts`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        employee_id: employeeId,
-      }),
     },
   )
 
@@ -478,7 +487,7 @@ export async function submitQuizAttempt(
   attemptId: string,
   answers: AttemptAnswerSubmitInput[],
 ): Promise<AttemptResult> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/attempts/${encodeURIComponent(attemptId)}/submit`,
     {
       method: 'POST',
@@ -504,7 +513,7 @@ export async function submitQuizAttempt(
 export async function getQuizOverview(
   quizId: string,
 ): Promise<QuizOverview> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/overview`,
   )
 
@@ -523,7 +532,7 @@ export async function getQuizOverview(
 export async function getQuizAttemptResults(
   quizId: string,
 ): Promise<AttemptResult[]> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/quizzes/${encodeURIComponent(quizId)}/attempts`,
   )
 

@@ -2,8 +2,10 @@ import os
 from uuid import uuid4
 
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./cloudmentor-test.db")
+os.environ["DATABASE_URL"] = "sqlite:///./cloudmentor-test.db"
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
+os.environ.setdefault("JWT_SECRET", "test-only-jwt-secret-at-least-32-bytes")
+os.environ.setdefault("LOG_FORMAT", "json")
 
 import pytest
 from sqlalchemy import create_engine

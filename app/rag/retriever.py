@@ -5,7 +5,14 @@ from app.core.logger import logger
 
 
 class Retriever:
-    """Query a vector collection and normalize traceable retrieval results."""
+    """Query a vector collection and normalize traceable retrieval results.
+
+    Collections are pinned to cosine space, so Chroma returns cosine
+    distance in the range 0..2. The default cutoff is derived from
+    ``MIN_COSINE_SIMILARITY``; chunks that do not clear the similarity
+    floor are dropped before answer generation, which reduces
+    hallucinations and paid LLM calls for out-of-scope questions.
+    """
 
     def __init__(self, vector_store: Any):
         self.collection = vector_store.collection
@@ -20,6 +27,8 @@ class Retriever:
     ) -> list[dict[str, Any]]:
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero")
+        if threshold < 0:
+            raise ValueError("threshold must not be negative")
         if allowed_document_ids is not None:
             allowed_document_ids = list(
                 dict.fromkeys(allowed_document_ids)

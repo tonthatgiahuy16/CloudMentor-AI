@@ -19,12 +19,33 @@ class VectorStore:
         )
 
         self.collection = self.client.get_or_create_collection(
-            name=collection_name
+            name=collection_name,
+            metadata={"hnsw:space": config.VECTOR_SPACE},
         )
+
+        actual_space = self.collection_space(self.collection)
+        if actual_space != config.VECTOR_SPACE:
+            raise RuntimeError(
+                f"Chroma collection '{collection_name}' uses '{actual_space}' space, "
+                f"expected '{config.VECTOR_SPACE}'. Run "
+                "`python -m scripts.rebuild_vector_collection --apply`."
+            )
 
         logger.info(
             f"Vector collection initialized: {collection_name}"
         )
+
+
+    @staticmethod
+    def collection_space(collection) -> str:
+        metadata = getattr(collection, "metadata", None)
+
+        if not isinstance(metadata, dict):
+            return "l2"
+
+        return str(
+            metadata.get("hnsw:space", "l2")
+        ).lower()
 
 
     def add(

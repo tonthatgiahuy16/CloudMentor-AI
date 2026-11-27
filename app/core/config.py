@@ -58,7 +58,36 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 
 TOP_K = 3
 
-SIMILARITY_THRESHOLD = 1.0
+# The vector collection is pinned to cosine space, so Chroma returns
+# cosine distance (0 = identical, 2 = opposite). Chunks below the
+# configured similarity floor are discarded before Gemini is called.
+MIN_COSINE_SIMILARITY = float(
+    os.getenv("MIN_COSINE_SIMILARITY", "0.50")
+)
+
+# Maximum cosine distance accepted by the retriever. Kept as a named
+# constant because evaluation scripts and older callers use it.
+SIMILARITY_THRESHOLD = 1.0 - MIN_COSINE_SIMILARITY
+
+VECTOR_SPACE = "cosine"
+
+# ==========================
+# Authentication
+# ==========================
+
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+
+JWT_ALGORITHM = "HS256"
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+)
+
+# ==========================
+# Observability
+# ==========================
+
+LOG_FORMAT = os.getenv("LOG_FORMAT", "json").strip().lower()
 
 # ==========================
 # Public demo controls

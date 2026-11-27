@@ -1,7 +1,12 @@
 from hashlib import sha256
 from pathlib import Path
+from time import perf_counter
 from uuid import uuid4
 
+from app.core.logger import get_request_id, logger
+from app.repos.processing_event_repository import (
+    ProcessingEventRepository,
+)
 from app.storage.source_storage import (
     LocalSourceStorage,
     SourceNotFoundError,
@@ -20,6 +25,7 @@ class PDFService:
         self,
         document_repo,
         source_storage: SourceStorage | None = None,
+        event_repo: ProcessingEventRepository | None = None,
     ):
         from app.pipeline.chunk_pipeline import (
             ChunkPipeline,
@@ -43,6 +49,7 @@ class PDFService:
         self.embedding = EmbeddingPipeline()
         self.index = IndexPipeline()
         self.document_repo = document_repo
+        self.event_repo = event_repo
 
         if source_storage is None:
             source_storage = LocalSourceStorage(
@@ -261,6 +268,122 @@ class PDFService:
         )
 
 
+    def _event_repository(
+        self,
+    ) -> ProcessingEventRepository | None:
+        if getattr(self, "event_repo", None) is not None:
+            return self.event_repo
+
+        db = getattr(self.document_repo, "db", None)
+        if db is None:
+            return None
+
+        return ProcessingEventRepository(db)
+
+
+    def _record_processing_event(
+        self,
+        *,
+        document_id: str,
+        stage: str,
+        status: str,
+        duration_ms: int,
+        error_code: str | None = None,
+    ) -> None:
+        repository = self._event_repository()
+        if repository is None:
+            return
+
+        try:
+            repository.record(
+                document_id=document_id,
+                stage=stage,
+                status=status,
+                duration_ms=duration_ms,
+                error_code=error_code,
+                request_id=get_request_id(),
+            )
+        except Exception:
+            # Observability must never turn a successful ingestion into
+            # a failed one. The warning still leaves a trace.
+            logger.warning(
+                "Failed to persist pipeline stage event",
+                extra={
+                    "structured": {
+                        "event": "pipeline_stage_event_failed",
+                        "document_id": document_id,
+                        "stage": stage,
+                        "status": status,
+                    },
+                },
+            )
+
+
+    def _run_stage(
+        self,
+        *,
+        document_id: str,
+        stage: str,
+        operation,
+    ):
+        self.document_repo.record_processing_heartbeat(
+            document_id=document_id,
+            stage=stage,
+        )
+        started = perf_counter()
+
+        try:
+            result = operation()
+        except Exception as exc:
+            duration_ms = int(
+                (perf_counter() - started) * 1000
+            )
+            self._record_processing_event(
+                document_id=document_id,
+                stage=stage,
+                status="FAILED",
+                duration_ms=duration_ms,
+                error_code=type(exc).__name__,
+            )
+            logger.warning(
+                "Pipeline stage failed",
+                extra={
+                    "structured": {
+                        "event": "pipeline_stage",
+                        "document_id": document_id,
+                        "stage": stage,
+                        "status": "FAILED",
+                        "duration_ms": duration_ms,
+                        "error_code": type(exc).__name__,
+                    },
+                },
+            )
+            raise
+
+        duration_ms = int(
+            (perf_counter() - started) * 1000
+        )
+        self._record_processing_event(
+            document_id=document_id,
+            stage=stage,
+            status="SUCCEEDED",
+            duration_ms=duration_ms,
+        )
+        logger.info(
+            "Pipeline stage completed",
+            extra={
+                "structured": {
+                    "event": "pipeline_stage",
+                    "document_id": document_id,
+                    "stage": stage,
+                    "status": "SUCCEEDED",
+                    "duration_ms": duration_ms,
+                },
+            },
+        )
+        return result
+
+
     def _process_document(
         self,
         *,
@@ -276,53 +399,53 @@ class PDFService:
 
         try:
             stage = "EXTRACT"
-            self.document_repo.record_processing_heartbeat(
+            documents = self._run_stage(
                 document_id=document_id,
                 stage=stage,
-            )
-            documents = self.extract.run(
-                source_data=source_data,
-                filename=filename,
-                file_type=file_type,
-                document_id=document_id,
-                subject_id=subject_id,
+                operation=lambda: self.extract.run(
+                    source_data=source_data,
+                    filename=filename,
+                    file_type=file_type,
+                    document_id=document_id,
+                    subject_id=subject_id,
+                ),
             )
 
             stage = "TRANSFORM"
-            self.document_repo.record_processing_heartbeat(
+            cleaned = self._run_stage(
                 document_id=document_id,
                 stage=stage,
-            )
-            cleaned = self.transform.run(
-                documents
+                operation=lambda: self.transform.run(
+                    documents
+                ),
             )
 
             stage = "CHUNK"
-            self.document_repo.record_processing_heartbeat(
+            chunks = self._run_stage(
                 document_id=document_id,
                 stage=stage,
-            )
-            chunks = self.chunk.run(
-                cleaned
+                operation=lambda: self.chunk.run(
+                    cleaned
+                ),
             )
 
             stage = "EMBEDDING"
-            self.document_repo.record_processing_heartbeat(
+            embeddings = self._run_stage(
                 document_id=document_id,
                 stage=stage,
-            )
-            embeddings = self.embedding.run(
-                chunks
+                operation=lambda: self.embedding.run(
+                    chunks
+                ),
             )
 
             stage = "INDEX"
-            self.document_repo.record_processing_heartbeat(
+            self._run_stage(
                 document_id=document_id,
                 stage=stage,
-            )
-            self.index.run(
-                chunks,
-                embeddings,
+                operation=lambda: self.index.run(
+                    chunks,
+                    embeddings,
+                ),
             )
 
             self.document_repo.mark_indexed(

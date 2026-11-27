@@ -1,11 +1,14 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.api.quizzes import (
     get_quiz_authoring_service,
     get_quiz_grading_service,
+    get_quiz_repository,
     router,
 )
+from tests.auth_stubs import override_auth
 
 
 class FakeAuthoringService:
@@ -106,6 +109,14 @@ class FakeGradingService:
             raise self.error
 
 
+class FakeQuizAttemptRepository:
+    def get_attempt(self, attempt_id):
+        return SimpleNamespace(
+            attempt_id=attempt_id,
+            employee_id="new-hire-1",
+        )
+
+
 def make_client(
     authoring_service=None,
     grading_service=None,
@@ -118,6 +129,15 @@ def make_client(
     app.dependency_overrides[
         get_quiz_grading_service
     ] = lambda: grading_service or FakeGradingService()
+    app.dependency_overrides[
+        get_quiz_repository
+    ] = lambda: FakeQuizAttemptRepository()
+
+    override_auth(
+        app,
+        role="admin",
+        employee_id="new-hire-1",
+    )
 
     return TestClient(app)
 

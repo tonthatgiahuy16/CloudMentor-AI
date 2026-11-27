@@ -1,5 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from app.api.deps import (
+    require_admin,
+    require_authenticated,
+)
 from app.api.upload import get_source_storage
 from app.core.demo_mode import require_mutations_enabled
 from app.core.database import SessionLocal
@@ -81,6 +85,7 @@ def get_subject_restore_service(
 @router.get("/", response_model=list[SubjectResponse])
 def list_subjects(
     subject_repo=Depends(get_subject_repository),
+    _=Depends(require_authenticated),
 ):
     subjects = subject_repo.list_active()
 
@@ -99,6 +104,7 @@ def list_subjects(
 )
 def list_subject_trash(
     subject_repo=Depends(get_subject_repository),
+    _=Depends(require_admin),
 ):
     subjects = subject_repo.list_trash()
 
@@ -124,6 +130,7 @@ def list_subject_trash(
 def create_subject(
     payload: SubjectCreate,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     subject_repo=Depends(get_subject_repository),
 ):
     try:
@@ -147,6 +154,7 @@ def create_subject(
 def delete_subject(
     subject_id: str,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     deletion_service=Depends(
         get_subject_deletion_service
     ),
@@ -177,6 +185,7 @@ def delete_subject(
 def restore_subject(
     subject_id: str,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     restore_service=Depends(
         get_subject_restore_service
     ),

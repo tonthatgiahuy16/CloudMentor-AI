@@ -57,4 +57,10 @@ python_files = [
   "test_quiz_api.py",
   "test_policy_version_service.py",
   "test_policy_version_activation.py",
+  "test_auth.py",
+  "test_route_authorization.py",
+  "test_rbac_end_to_end.py",
+  "test_pipeline_observability.py",
+  "test_observability_logging.py",
+  "test_threshold_calibration.py",
 ]

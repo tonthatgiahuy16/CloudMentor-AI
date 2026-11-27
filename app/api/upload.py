@@ -22,6 +22,7 @@ from app.storage.source_storage_factory import (
     create_source_storage,
 )
 from app.core.demo_mode import require_mutations_enabled
+from app.api.deps import require_admin
 from app.core.database import SessionLocal
 from app.repos.document_repository import (
     ActiveDocumentConflictError,
@@ -213,6 +214,7 @@ async def upload_document(
     subject_id: str = Form(...),
     chapter: int | None = Form(None),
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     pdf_service=Depends(get_pdf_service),
     subject_repo=Depends(
         get_upload_subject_repository
