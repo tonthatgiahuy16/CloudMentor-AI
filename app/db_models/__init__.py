@@ -7,6 +7,8 @@ from app.db_models.quiz import (
     QuizOption,
     QuizQuestion,
 )
+from app.db_models.user import User
+from app.db_models.processing_event import ProcessingEvent
 
 __all__ = [
     "Subject",
@@ -16,4 +18,6 @@ __all__ = [
     "QuizOption",
     "QuizAttempt",
     "QuizAttemptAnswer",
+    "User",
+    "ProcessingEvent",
 ]

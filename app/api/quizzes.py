@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.api.deps import (
+    require_admin,
+    require_authenticated,
+)
 from app.core.database import SessionLocal
 from app.core.demo_mode import require_mutations_enabled
 from app.repos.quiz_repository import QuizRepository
 from app.schemas.quiz import (
     AttemptResult,
-    AttemptStartRequest,
     AttemptStartResponse,
     AttemptSubmitRequest,
     QuizCreate,
@@ -67,6 +70,35 @@ def _conflict(message: str) -> HTTPException:
     )
 
 
+def _get_attempt_for_actor(
+    *,
+    quiz_repo,
+    attempt_id: str,
+    actor,
+    allow_admin: bool,
+):
+    """Load an attempt and enforce owner-scoped access.
+
+    Employees may only read or submit their own attempts. Administrators
+    may read any attempt for training analytics, but may not submit on
+    behalf of an employee. A missing attempt and a foreign attempt both
+    return 404 so attempt IDs cannot be enumerated.
+    """
+
+    attempt = quiz_repo.get_attempt(attempt_id)
+
+    if attempt is None:
+        raise _not_found("Attempt not found")
+
+    if actor.role == "admin" and allow_admin:
+        return attempt
+
+    if attempt.employee_id != actor.employee_id:
+        raise _not_found("Attempt not found")
+
+    return attempt
+
+
 @router.post(
     "/",
     response_model=QuizCreateResponse,
@@ -75,6 +107,7 @@ def _conflict(message: str) -> HTTPException:
 def create_quiz(
     payload: QuizCreate,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     authoring_service=Depends(get_quiz_authoring_service),
 ):
     return authoring_service.create_quiz(
@@ -90,6 +123,7 @@ def create_quiz(
 def list_quizzes(
     subject_id: str = Query(min_length=1),
     authoring_service=Depends(get_quiz_authoring_service),
+    _=Depends(require_authenticated),
 ):
     return authoring_service.list_published_quizzes(
         subject_id=subject_id,
@@ -105,6 +139,7 @@ def add_question(
     quiz_id: str,
     payload: QuizQuestionCreate,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     authoring_service=Depends(get_quiz_authoring_service),
 ):
     try:
@@ -139,6 +174,7 @@ def add_question(
 def publish_quiz(
     quiz_id: str,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     authoring_service=Depends(get_quiz_authoring_service),
 ):
     try:
@@ -157,6 +193,7 @@ def publish_quiz(
 def get_quiz_overview(
     quiz_id: str,
     grading_service=Depends(get_quiz_grading_service),
+    _=Depends(require_admin),
 ):
     try:
         return grading_service.get_overview(quiz_id)
@@ -174,14 +211,14 @@ def get_quiz_overview(
 )
 def start_attempt(
     quiz_id: str,
-    payload: AttemptStartRequest,
     _=Depends(require_mutations_enabled),
+    current_user=Depends(require_authenticated),
     grading_service=Depends(get_quiz_grading_service),
 ):
     try:
         return grading_service.start_attempt(
             quiz_id=quiz_id,
-            employee_id=payload.employee_id,
+            employee_id=current_user.employee_id,
         )
     except RuntimeError as exc:
         message = str(exc)
@@ -197,6 +234,7 @@ def start_attempt(
 def list_attempt_results(
     quiz_id: str,
     grading_service=Depends(get_quiz_grading_service),
+    _=Depends(require_admin),
 ):
     try:
         return grading_service.list_attempt_results(quiz_id)
@@ -213,8 +251,17 @@ def list_attempt_results(
 )
 def get_attempt_result(
     attempt_id: str,
+    current_user=Depends(require_authenticated),
+    quiz_repo=Depends(get_quiz_repository),
     grading_service=Depends(get_quiz_grading_service),
 ):
+    _get_attempt_for_actor(
+        quiz_repo=quiz_repo,
+        attempt_id=attempt_id,
+        actor=current_user,
+        allow_admin=True,
+    )
+
     try:
         return grading_service.get_result(attempt_id)
     except RuntimeError as exc:
@@ -232,8 +279,17 @@ def submit_attempt(
     attempt_id: str,
     payload: AttemptSubmitRequest,
     _=Depends(require_mutations_enabled),
+    current_user=Depends(require_authenticated),
+    quiz_repo=Depends(get_quiz_repository),
     grading_service=Depends(get_quiz_grading_service),
 ):
+    _get_attempt_for_actor(
+        quiz_repo=quiz_repo,
+        attempt_id=attempt_id,
+        actor=current_user,
+        allow_admin=False,
+    )
+
     try:
         return grading_service.submit_attempt(
             attempt_id=attempt_id,
@@ -259,6 +315,7 @@ def submit_attempt(
 def get_quiz(
     quiz_id: str,
     authoring_service=Depends(get_quiz_authoring_service),
+    _=Depends(require_authenticated),
 ):
     try:
         return authoring_service.get_published_quiz(

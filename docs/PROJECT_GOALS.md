@@ -20,7 +20,7 @@ The current MVP is intentionally a single-company demo using sample identities a
 - **Training Admin:** manages policy documents and their effective dates, creates or reviews onboarding quizzes, publishes approved quizzes, and views training completion summaries.
 - **Employee:** looks up current policy information, completes assigned or available onboarding quizzes, and reviews personal results and referenced policy material.
 
-These are product roles. The current demo's separate workspaces do not provide authenticated identity or backend-enforced authorization; access control is a future requirement before real employee or multi-company use.
+These are product roles. The current demo provides authenticated sample identities and backend-enforced `admin`/`employee` authorization. It does not provide tenant isolation, data-governance controls, or the operational hardening required before real employee or multi-company use.
 
 ## 3. Goals
 
@@ -61,7 +61,7 @@ Employees can inspect their quiz results and cited material. Training owners can
 
 ### Safe organizational growth
 
-Before supporting real companies or employee identities, the platform must add authentication, backend authorization, tenant isolation, data minimization, and retention/deletion rules, then verify those boundaries with tests. Production operations also require independent backups, restore exercises, monitoring, and shared rate limiting.
+Before supporting real companies or employee identities, the platform must harden the implemented authentication and authorization layer; add tenant isolation, data minimization, and retention/deletion rules; then verify those boundaries with tests. Production operations also require independent backups, restore exercises, monitoring, and shared rate limiting.
 
 ## 5. Completion evidence
 

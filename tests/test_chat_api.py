@@ -2,6 +2,8 @@ import pytest
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+
+from tests.auth_stubs import override_auth
 from types import SimpleNamespace
 from app.api.chat import (
     chat,
@@ -66,6 +68,8 @@ def make_client(
     app.dependency_overrides[
         get_chat_subject_repository
     ] = lambda: subject_repo
+
+    override_auth(app)
 
     return TestClient(app)
 

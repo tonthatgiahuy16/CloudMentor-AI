@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:?Set POSTGRES_USER in .env} -d ${POSTGRES_DB:?Set POSTGRES_DB in .env}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  minio:
+    build:
+      context: ./tests/containers/minio
+      dockerfile: Dockerfile
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${CLOUDMENTOR_MINIO_ACCESS_KEY:?Set CLOUDMENTOR_MINIO_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${CLOUDMENTOR_MINIO_SECRET_KEY:?Set CLOUDMENTOR_MINIO_SECRET_KEY in .env}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--spider",
+          "http://localhost:9000/minio/health/live",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  minio-init:
+    image: amazon/aws-cli:2.42.4
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${CLOUDMENTOR_MINIO_ACCESS_KEY:?Set CLOUDMENTOR_MINIO_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${CLOUDMENTOR_MINIO_SECRET_KEY:?Set CLOUDMENTOR_MINIO_SECRET_KEY in .env}
+      AWS_DEFAULT_REGION: us-east-1
+      MINIO_BUCKET: ${CLOUDMENTOR_MINIO_BUCKET:-cloudmentor-sources}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        aws --endpoint-url http://minio:9000 s3api head-bucket --bucket "$${MINIO_BUCKET}" 2>/dev/null || \
+        aws --endpoint-url http://minio:9000 s3 mb "s3://$${MINIO_BUCKET}"
+    restart: "no"
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests.auth_stubs import override_auth
+
 from app.api.health import router as health_router
 from app.api.subjects import (
     get_subject_repository,
@@ -21,6 +23,7 @@ def test_demo_mode_blocks_subject_creation(monkeypatch):
     app.dependency_overrides[get_subject_repository] = (
         lambda: FakeSubjectRepository()
     )
+    override_auth(app)
     monkeypatch.setattr(config, "DEMO_MODE", True)
 
     response = TestClient(app).post(

@@ -2151,3 +2151,25 @@ td strong {
     font-size: 11px;
   }
 }
+
+.login-panel {
+  max-width: 440px;
+  margin: 72px auto;
+  display: grid;
+  gap: 20px;
+}
+
+.login-form {
+  display: grid;
+  gap: 16px;
+}
+
+.login-form .form-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 4px;
+}

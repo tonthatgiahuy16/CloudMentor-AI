@@ -6,6 +6,7 @@ from fastapi import (
     status,
 )
 from functools import lru_cache
+from app.api.deps import require_authenticated
 from app.core.rate_limit import enforce_chat_rate_limit
 from app.llm.exceptions import (
     LLMProviderError,
@@ -74,6 +75,7 @@ def chat(
     subject_repo=Depends(
         get_chat_subject_repository
     ),
+    _=Depends(require_authenticated),
 ):
 
     enforce_chat_rate_limit(http_request)

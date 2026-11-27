@@ -5,6 +5,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests.auth_stubs import override_auth
+
 import app.api.upload as upload_api
 from app.api.upload import (
     get_pdf_service,
@@ -199,6 +201,8 @@ def make_client(
     app.dependency_overrides[
         get_upload_subject_repository
     ] = lambda: subject_repo
+
+    override_auth(app)
 
     return TestClient(app), service
 

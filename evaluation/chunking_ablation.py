@@ -61,6 +61,7 @@ def run_ablation(
     client = chromadb.EphemeralClient()
     collection = client.create_collection(
         name=f"chunking-ablation-{uuid4().hex}",
+        metadata={"hnsw:space": config.VECTOR_SPACE},
     )
     collection.add(
         ids=[chunk.id for chunk in chunks],
@@ -100,6 +101,10 @@ def run_ablation(
                     "passes_production_threshold": (
                         distance <= config.SIMILARITY_THRESHOLD
                     ),
+                    "cosine_similarity": round(
+                        1.0 - distance,
+                        4,
+                    ),
                 }
             )
         measurements.append({"query": query, "candidates": candidates})
@@ -108,6 +113,8 @@ def run_ablation(
         "source_path": str(source_path),
         "target_paragraph": target_paragraph,
         "similarity_threshold": config.SIMILARITY_THRESHOLD,
+        "min_cosine_similarity": config.MIN_COSINE_SIMILARITY,
+        "vector_space": config.VECTOR_SPACE,
         "variants": variants,
         "measurements": measurements,
     }

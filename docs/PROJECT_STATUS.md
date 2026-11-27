@@ -6,11 +6,51 @@ This document records the implementation status of CloudMentor AI at a specific 
 
 | Field | Value |
 | --- | --- |
-| Snapshot date | 2026-11-09 |
-| Git baseline | The four MVP commits are present on `main`, from `a114b50` through `5ac4967`; this latest 439-test evidence update is not yet committed. |
-| Current milestone | MVP 1 policy versioning and date-aware retrieval, MVP 2 persisted onboarding quizzes, and MVP 3 demo workspaces are implemented in the current working tree. The Render configuration remains a constrained demo blueprint, not evidence of a deployed service. |
-| Overall state | PostgreSQL remains the system of record and Chroma a rebuildable derived index. Policy documents use `effective_from` and exclusive `effective_until` dates; RAG selects eligible document IDs before vector retrieval. Quiz definitions, questions, options, attempts, and answers are stored in PostgreSQL, with server-side grading and question source-version references. The frontend provides separate training-admin and employee demo workspaces. No authenticated identity or backend-enforced role authorization exists. |
-| Local verification | **User-reported:** after adding `test_date_utils.py` to pytest's explicit discovery list, the backend suite completed with `439 passed, 3 skipped, 1 warning in 7.79s`. Frontend lint and production build passed in a separate local run. The configured PostgreSQL database reports Alembic revision `c4f1a9b2d7e5` as head. User-reported manual end-to-end testing of the demo flows was generally successful. These checks do not establish a production deployment or production readiness. |
+| Snapshot date | 2026-11-27 (working tree; historical baseline 2026-11-09 below) |
+| Git baseline | The four MVP commits are present on `main`, from `a114b50` through `5ac4967`; the working tree adds JWT auth/RBAC, observability, cosine vector-space pinning, Docker Compose, and the 488-test evidence update (uncommitted). |
+| Current milestone | MVP 1 policy versioning and date-aware retrieval, MVP 2 persisted onboarding quizzes, MVP 3 workspaces, JWT auth/RBAC, structured logging/pipeline metrics, and cosine-pinned retrieval are implemented in the current working tree. The Render configuration remains a constrained demo blueprint, not evidence of a deployed service. |
+| Overall state | PostgreSQL remains the system of record and Chroma a rebuildable derived index. Policy documents use `effective_from` and exclusive `effective_until` dates; RAG selects eligible document IDs before vector retrieval. Quiz definitions, questions, options, attempts, and answers are stored in PostgreSQL, with server-side grading and question source-version references. The current working tree enforces JWT authentication, `admin`/`employee` roles, owner-scoped attempt access, JSON logging, and cosine-space startup validation. |
+| Local verification | `488 passed, 3 skipped, 2 warnings in 22.98s` for the full backend suite (3 opt-in MinIO/PostgreSQL integration cases skipped). Frontend `npm run lint` and `npm run build` passed. Live 39-case `cosine` retrieval sweep scored `27/27` (`100%`) at `0.50` and recommended `0.55`. Target Alembic revision is `f3b7c9d1e2a4` (applied locally). These are local checks, not CI or production deployment evidence. |
+
+## 2026-11-27 working-tree update (uncommitted)
+
+The current working tree adds an authentication and authorization layer
+that is not yet part of the 2026-11-09 snapshot below:
+
+- A `users` table with Argon2id password hashes, `POST /auth/token`
+  issuing short-lived HS256 bearer tokens, and `admin`/`employee` roles.
+- Backend enforcement on admin routes, including subject restore, quiz
+  overview, quiz attempt listing, and pipeline metrics.
+- Owner-scoped quiz attempt reads and submissions. Foreign attempts
+  return `404`; administrators may read but not submit an employee's
+  attempt. The employee identity comes from the token instead of the
+  request body.
+- `correct_option_id` is withheld until an attempt is submitted and then
+  shown only to the attempt owner or an administrator. Retakes remain
+  allowed for training quizzes.
+- JSON request logging with `X-Request-ID`, redaction, per-stage
+  `document_processing_events`, and `GET /metrics/pipeline`.
+- Chroma collections pinned to cosine space, `MIN_COSINE_SIMILARITY`,
+  startup blocking on collection space mismatch (`VectorStore.__init__`
+  raises `RuntimeError` until `scripts.rebuild_vector_collection --apply`
+  is run), a threshold-calibration sweep, and a 39-case grouped evaluation
+  set with policy `effective_from`/`effective_until` boundary cases.
+- A minimal frontend login flow that stores the bearer token, attaches
+  it to API calls, removes the client-supplied employee id from attempt
+  start, and limits navigation by the token role.
+
+Local verification: `488 passed, 3 skipped, 2 warnings in 22.98s` for
+the full backend suite (3 opt-in MinIO and PostgreSQL integration cases
+skipped). Frontend `npm run lint` and `npm run build` passed. A live
+39-case `cosine` retrieval and threshold-calibration run with
+`BAAI/bge-m3` in an isolated ephemeral collection scored `27/27` (`100%`)
+answerable hit rate and `11/12` (`91.67%`) unanswerable context return
+at `MIN_COSINE_SIMILARITY=0.50`; the sweep (`min_hit_rate=0.90`)
+recommended `0.55` (`26/27` = `96.3%` hit rate, reducing unanswerable
+context returns to `7/12` = `58.33%`). These are local checks, not CI or
+deployment evidence. See
+[`AUTH_OBSERVABILITY_OPERATIONS.md`](./AUTH_OBSERVABILITY_OPERATIONS.md)
+for operator commands and the access policy.
 
 The four MVP commits on `main` contain the policy, quiz, and onboarding implementation described in this snapshot. The latest user-reported 439-test verification is recorded here but is not yet committed. The historical Phase 2.5 baseline and its post-evidence F01 and F02 remediation records are documented in [`PHASE2_RELIABILITY_MANIFEST.md`](./PHASE2_RELIABILITY_MANIFEST.md) and [`PHASE2_RELIABILITY_REPORT.md`](./PHASE2_RELIABILITY_REPORT.md); they do not establish production readiness or authorize a private beta.
 
@@ -69,18 +109,18 @@ A live local recovery was verified on 2026-10-17 against the application state m
 | Policy effective windows and date-aware RAG | Implemented in current working tree | `effective_from` and exclusive `effective_until` are stored in PostgreSQL; business-date handling and eligible-document filtering constrain retrieval, with version-aware citations. Migration: `7a2d5f1c9b31`. |
 | Onboarding quiz authoring, publication, and grading | Implemented in current working tree | PostgreSQL quiz, question, option, attempt, and answer tables; published quizzes use stored answer keys; server-side grading and score bounds are tested. Migration: `c4f1a9b2d7e5`. |
 | Quiz source lineage | Implemented in current working tree | Questions can retain `source_document_id` and `source_document_version`; quiz API and frontend expose source context. |
-| Employee and training-admin demo workspaces | Implemented as demo UI in current working tree | Frontend includes policy lookup, quiz authoring/overview, employee quiz, and personal results flows. Workspace selection is not authentication or backend authorization. |
+| Employee and training-admin workspaces | Implemented with token-scoped navigation in current working tree | Frontend login stores a bearer token, attaches it to API calls, and shows pages allowed by the token role. Backend authentication and role checks now enforce the boundary; this is still a single-company demo identity model. |
 | Answer and source rendering | Implemented | Frontend renders context-constrained answers with document plus page, line-range, or paragraph-range references |
 | Document deletion | Implemented and automatically covered | PDF, TXT, and DOCX lifecycle tests verify Chroma removal, PostgreSQL `DELETED` state, and post-delete retrieval behavior |
 | Retained-source Chroma rebuild | Implemented through subject restore | Automated multi-format and failure-path rebuild tests plus live local-filesystem and MinIO cycles preserve source identity and lineage; the MinIO cycle rebuilt 14 TXT/DOCX/PDF chunks and preserved format-aware citations, and a live outage retry rebuilt the same document without duplicate vectors |
 | Guarded legacy-source repair | Implemented operator workflow | Dry-run-first CLI, checksum and size verification, conflict protection, idempotent rerun tests, and live recovery evidence |
 | Legacy `subject_id` backfill | Completed locally | Dry run found 223 missing values; apply updated them; second dry run found 0 |
 | Controlled PostgreSQL-Chroma reconciliation repair | Implemented operator workflow | Default audit and `--repair` are dry runs; `--repair --apply` deletes orphan chunks and rebuilds active indexed documents with no chunks, logs each outcome, isolates per-action failure, and is safe to rerun; missing lineage, known non-expected documents, and subject mismatches remain report-only |
-| Retrieval-evaluation baseline | Implemented locally and expanded | A versioned 14-case TXT/DOCX/PDF dataset, three distractors, bilingual lineage and anchor queries, fixture/evidence validation, evidence-coverage scoring, live-retrieval and chunking-ablation CLIs, and automated tests. **User-reported local evidence:** the paragraph-aware layout returned expected evidence for 11/11 answerable cases; raw retrieval still returned results for 2/3 unanswerable cases. |
+| Retrieval-evaluation baseline | Implemented locally and expanded | A versioned 39-case TXT/DOCX/PDF dataset (27 answerable, 12 unanswerable) covers lineage, transform, validation, lifecycle, storage, date windows, bilingual lineage queries, distractors, and unanswerable questions. A threshold-calibration sweep recommends a cosine cutoff from observed distances. Earlier user-reported paragraph-aware evidence returned expected evidence for 11/11 answerable cases in the smaller set. |
 | Answer-quality and faithfulness baseline | Implemented locally | Human-reviewed answer correctness, faithfulness, and refusal labels are combined with automated citation-coverage scoring from source lineage. The original narrow live baseline scored 3/3 answerable cases and 1/1 appropriate refusal; a later unanswerable-only run produced 3/3 correct refusals. Broader answer quality remains unmeasured. |
 | Gemini provider resilience | Implemented and automatically covered | The service retries transient Google SDK `429` and `503` errors plus timeout errors with bounded exponential backoff; retry exhaustion maps to a controlled `503`, other provider errors to `502`. No circuit breaker or provider fallback exists. |
 | Controlled public-demo configuration | Implemented, not deployed | Dockerfile, Render Blueprint, persistent-disk paths, CORS allow-listing, `/healthz`, dependency-checking `/readyz`, demo-mode mutation blocking, token-protected seed, and an in-memory chat limit are present. It remains a one-instance demo design, not production operations. |
-| Production operations | Not implemented | Independent backups, authentication, authorization, shared/distributed rate limiting, monitoring, alerting, and an active deployment remain out of scope |
+| Production operations | Partially addressed; not production-ready | Independent backups, tenant isolation, shared/distributed rate limiting, external monitoring/alerting, and an active deployment remain out of scope. JWT authentication, admin/employee authorization, JSON logging, and PostgreSQL-backed pipeline metrics are implemented in the current working tree. |
 
 ## Verification evidence
 
@@ -242,8 +282,8 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 - TXT input is limited to UTF-8. DOCX ingestion supports body paragraphs; non-empty tables are explicitly rejected, and headers, footers, text boxes, images, and other complex Word structures are not extracted.
 - The retrieval benchmark contains 14 cases, but its live retrieval evidence remains a local, small-fixture evaluation: 11 answerable cases, three unanswerable cases, and three distractors. Answer correctness, faithfulness, and refusal are still human-reviewed; broader relevance and answer quality are unbenchmarked.
 - CI does not run live PostgreSQL, Chroma, embedding, and Gemini as one integration workflow.
-- Structured operational logging, metrics, tracing, and alerting are incomplete.
-- Authentication and authorization are not implemented. Chat rate limiting is process-local, so it is not sufficient for a horizontally scaled deployment.
+- Structured operational logging exists as JSON request and pipeline-stage events with request ids and redaction; PostgreSQL-backed stage metrics exist. External metrics aggregation, tracing, and alerting remain incomplete.
+- JWT authentication and role-based authorization are implemented in the current working tree. Tenant isolation is not implemented. Chat rate limiting is process-local, so it is not sufficient for a horizontally scaled deployment.
 - `/healthz` and dependency-checking `/readyz` exist, but they are not monitoring, alerting, or proof of a deployed service.
 - A constrained Render demo configuration exists, but no active deployment is established. Its persistent disk is not an independent backup, and the token-protected demo seed requires operator handling.
 - Gemini retries only `429`, `503`, and timeout failures. There is no circuit breaker, provider fallback, retry jitter, or persisted checkpoint/cache for batch answer evaluation.
@@ -252,7 +292,7 @@ PostgreSQL is the system of record for identity, metadata, and lifecycle state. 
 
 1. Establish independent PostgreSQL and source-file backups, then test restoration from those backups before making a production-readiness claim.
 2. Add metrics, structured logs, tracing, and alerting for ingestion, storage, retrieval, Gemini calls, and reconciliation; health/readiness probes already exist.
-3. Add authentication, authorization, and shared rate limiting before private beta or any multi-instance deployment.
+3. Harden the new authentication layer, add tenant isolation, and use shared rate limiting before private beta or any multi-instance deployment.
 4. Add checkpoint/cache behavior to batch answer evaluation, then expand the multi-format retrieval and answer-level datasets with harder relevance, citation, faithfulness, and refusal cases.
 
 ## Update policy

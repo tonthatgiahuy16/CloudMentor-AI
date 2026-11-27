@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from tests.auth_stubs import override_auth
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -389,6 +391,8 @@ def client(tmp_path, monkeypatch):
     ] = lambda: SubjectRepository(
         db_session
     )
+
+    override_auth(app)
 
     try:
         with TestClient(app) as client:

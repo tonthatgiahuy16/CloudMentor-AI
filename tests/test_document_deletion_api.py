@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from tests.auth_stubs import override_auth
 from types import SimpleNamespace
 
 from app.api.documents import (
@@ -30,6 +32,8 @@ def make_client(service):
     app.dependency_overrides[
         get_document_deletion_service
     ] = lambda: service
+
+    override_auth(app)
 
     return TestClient(app)
 
@@ -129,6 +133,8 @@ def make_query_client(document_repo):
     app.dependency_overrides[
         get_document_repository
     ] = lambda: document_repo
+
+    override_auth(app)
 
     return TestClient(app)
 

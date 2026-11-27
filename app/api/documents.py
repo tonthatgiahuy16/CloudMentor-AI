@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 
+from app.api.deps import require_admin
 from app.core.database import SessionLocal
 from app.core.date_utils import get_current_business_date
 from app.core.demo_mode import require_mutations_enabled
@@ -95,6 +96,7 @@ def serialize_document(document) -> dict:
 )
 def list_documents(
     document_repo=Depends(get_document_repository),
+    _=Depends(require_admin),
 ):
     documents = document_repo.list_active()
 
@@ -111,6 +113,7 @@ def list_documents(
 def get_document(
     document_id: str,
     document_repo=Depends(get_document_repository),
+    _=Depends(require_admin),
 ):
     document = (
         document_repo.get_visible_by_id(
@@ -137,6 +140,7 @@ def get_document(
 def delete_document(
     document_id: str,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     deletion_service=Depends(get_document_deletion_service),
 ):
     try:
@@ -160,6 +164,7 @@ def activate_policy_version(
     document_id: str,
     payload: PolicyVersionActivationRequest,
     _=Depends(require_mutations_enabled),
+    __=Depends(require_admin),
     version_service=Depends(get_policy_version_service),
 ):
     try:

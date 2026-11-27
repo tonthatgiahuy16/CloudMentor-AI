@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import ChatPanel from './components/ChatPanel'
 import MyResultsPanel from './components/MyResultsPanel'
@@ -12,6 +12,13 @@ import {
   getDocuments,
   getSubjects,
 } from './services/api'
+import {
+  clearSession,
+  getIdentity,
+  login,
+  type AuthIdentity,
+  type UserRole,
+} from './services/auth'
 import { isDocumentApplicableNow } from './services/onboardingStore'
 import type {
   DocumentRecord,
@@ -37,7 +44,6 @@ function formatDate(value: string): string {
   }).format(new Date(value))
 }
 
-type UserRole = 'admin' | 'employee'
 type ActivePage =
   | 'library'
   | 'authoring'
@@ -114,8 +120,13 @@ function NavigationIcon({ type }: { type: ActivePage }) {
 }
 
 function WorkspaceApp() {
-  const [userRole, setUserRole] = useState<UserRole>('admin')
-  const [activePage, setActivePage] = useState<ActivePage>('library')
+  const [identity, setIdentity] = useState<AuthIdentity | null>(
+    () => getIdentity(),
+  )
+  const userRole: UserRole = identity?.role ?? 'employee'
+  const [activePage, setActivePage] = useState<ActivePage>(
+    () => (getIdentity()?.role === 'admin' ? 'library' : 'chat'),
+  )
   const [libraryView, setLibraryView] = useState<LibraryView>('sources')
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [subjects, setSubjects] = useState<SubjectRecord[]>([])
@@ -125,14 +136,45 @@ function WorkspaceApp() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activatingId, setActivatingId] = useState<string | null>(null)
   const [overviewRefreshKey, setOverviewRefreshKey] = useState(0)
+  const [loginEmployeeId, setLoginEmployeeId] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
-  function handleRoleChange(newRole: UserRole) {
-    setUserRole(newRole)
-    if (newRole === 'admin') {
-      setActivePage('library')
-    } else {
-      setActivePage('chat')
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoginError(null)
+    setIsLoggingIn(true)
+
+    try {
+      const nextIdentity = await login(
+        loginEmployeeId.trim(),
+        loginPassword,
+      )
+
+      setIdentity(nextIdentity)
+      setActivePage(
+        nextIdentity.role === 'admin' ? 'library' : 'chat',
+      )
+      setLoginPassword('')
+    } catch (requestError) {
+      setLoginError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Không thể đăng nhập',
+      )
+    } finally {
+      setIsLoggingIn(false)
     }
+  }
+
+  function handleLogout() {
+    clearSession()
+    setIdentity(null)
+    setDocuments([])
+    setSubjects([])
+    setSelectedSubjectId('')
+    setActivePage('chat')
   }
 
   async function refreshDocuments() {
@@ -161,12 +203,16 @@ function WorkspaceApp() {
   }
 
   async function refreshWorkspace() {
+    if (!identity) return
+
     setIsLoading(true)
     setError(null)
 
     try {
       const [documentResult, subjectResult] = await Promise.all([
-        getDocuments(),
+        identity.role === 'admin'
+          ? getDocuments()
+          : Promise.resolve<DocumentRecord[]>([]),
         getSubjects(),
       ])
 
@@ -189,12 +235,18 @@ function WorkspaceApp() {
   }
 
   useEffect(() => {
+    if (!identity) {
+      return
+    }
+
     let isActive = true
 
     async function loadWorkspace() {
       try {
         const [documentResult, subjectResult] = await Promise.all([
-          getDocuments(),
+          identity?.role === 'admin'
+            ? getDocuments()
+            : Promise.resolve<DocumentRecord[]>([]),
           getSubjects(),
         ])
 
@@ -227,7 +279,7 @@ function WorkspaceApp() {
     return () => {
       isActive = false
     }
-  }, [])
+  }, [identity])
 
   function handleSubjectCreated(subject: SubjectRecord) {
     setSubjects((current) => [...current, subject])
@@ -314,6 +366,72 @@ function WorkspaceApp() {
 
   const currentNavPages = ROLE_PAGES[userRole]
 
+  if (!identity) {
+    return (
+      <div className="app-shell">
+        <main className="main-content">
+          <section className="document-panel login-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="panel-kicker">CloudMentor AI</span>
+                <h1>Đăng nhập</h1>
+                <p>
+                  Dùng mã nhân viên và mật khẩu được cấp để truy cập
+                  không gian làm việc.
+                </p>
+              </div>
+            </div>
+
+            <form
+              className="login-form"
+              onSubmit={(event) => void handleLogin(event)}
+            >
+              <label className="form-field" htmlFor="login-employee-id">
+                <span>Mã nhân viên</span>
+                <input
+                  id="login-employee-id"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="Ví dụ: admin hoặc alice"
+                  value={loginEmployeeId}
+                  onChange={(event) => setLoginEmployeeId(event.target.value)}
+                  required
+                />
+              </label>
+
+              <label className="form-field" htmlFor="login-password">
+                <span>Mật khẩu</span>
+                <input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Nhập mật khẩu"
+                  value={loginPassword}
+                  onChange={(event) => setLoginPassword(event.target.value)}
+                  required
+                />
+              </label>
+
+              {loginError && (
+                <div className="error-banner" role="alert">
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <button
+                className="primary-button login-submit"
+                type="submit"
+                disabled={isLoggingIn}
+              >
+                {isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              </button>
+            </form>
+          </section>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -356,24 +474,22 @@ function WorkspaceApp() {
             <strong>{PAGE_LABELS[activePage]}</strong>
           </div>
 
-          <div className="role-switcher-box" role="radiogroup" aria-label="Vai trò làm việc">
-            <span className="role-switcher-label">Không gian:</span>
-            <div className="role-switcher-group">
-              <button
-                type="button"
-                className={`role-switcher-btn ${userRole === 'admin' ? 'active' : ''}`}
-                onClick={() => handleRoleChange('admin')}
-              >
-                <span>👔 Người phụ trách đào tạo</span>
-              </button>
-              <button
-                type="button"
-                className={`role-switcher-btn ${userRole === 'employee' ? 'active' : ''}`}
-                onClick={() => handleRoleChange('employee')}
-              >
-                <span>🎓 Nhân viên mới</span>
-              </button>
-            </div>
+          <div className="role-switcher-box">
+            <span className="role-switcher-label">
+              {userRole === 'admin'
+                ? '👔 Người phụ trách đào tạo'
+                : '🎓 Nhân viên mới'}
+            </span>
+            <span className="role-switcher-label">
+              {identity.employee_id}
+            </span>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleLogout}
+            >
+              Đăng xuất
+            </button>
           </div>
 
           <label className="subject-context" htmlFor="workspace-subject">

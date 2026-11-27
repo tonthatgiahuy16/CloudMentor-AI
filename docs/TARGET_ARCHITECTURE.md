@@ -22,7 +22,7 @@ The first product slice supports one sample company and a focused onboarding pol
 - A training owner creates or reviews quiz questions before employees can take them.
 - The server grades submissions against approved answer keys and records training results.
 
-The MVP does not include multi-company tenancy, fine-grained department-based authorization, HR-system integrations, automated employment or legal decisions, advanced analytics, Kafka, Spark, or machine-learning recommendations. Use sample data until authentication and authorization are implemented and reviewed for real employee data.
+The MVP does not include multi-company tenancy, fine-grained department-based authorization, HR-system integrations, automated employment or legal decisions, advanced analytics, Kafka, Spark, or machine-learning recommendations. It implements authenticated sample identities and `admin`/`employee` authorization; use sample data until those controls are hardened and tenant and data-governance boundaries are reviewed for real employee data.
 
 ### Design principles
 
@@ -128,7 +128,7 @@ Effective-date and supersession rules must be explicit in the data contract. At 
 | Area | Component | Responsibility |
 | --- | --- | --- |
 | Experience | Frontend | Provide policy upload/management, employee question flow, approved quiz flow, and training overview. Clearly distinguish unavailable data from empty results. |
-| API | FastAPI routes | Validate requests, enforce the available access boundary, and return stable response contracts. Authentication and authorization are prerequisites before real employee data is used. |
+| API | FastAPI routes | Validate requests, enforce the available access boundary, and return stable response contracts. JWT authentication and `admin`/`employee` authorization are implemented for the sample-company demo; tenant isolation and production hardening remain prerequisites before real employee data is used. |
 | Policy control | PostgreSQL document registry | Own document identity, category/scope, source metadata, version relationships, effective dates, lifecycle, and applicability. |
 | Source retention | Local or MinIO source storage | Retain canonical source bytes used for processing, citation, retry, and rebuild. |
 | Ingestion | Extract, transform, chunk, embed | Convert supported sources into chunks while preserving document identity and page/line/paragraph locations. |
@@ -164,7 +164,7 @@ Quiz results associated with a named employee are employee-related data. The MVP
 | Quiz answer is ambiguous or wrong | Only human-approved questions and answer keys are published. | Review generated or manually authored questions against their cited source versions before publication; grading uses the stored key. |
 | No eligible policy evidence exists | Return a controlled no-evidence response. | Ask unsupported questions and verify no unrelated or obsolete document is cited. |
 | Chroma filter syntax or semantics differ by version | Verify the production query path with the installed dependency and retain a safe allow-list enforcement path. | Focused integration/contract coverage for the actual metadata types and combined query filters. |
-| Employee result data is exposed too broadly | Restrict overview access and retain only necessary data before real identities are introduced. | Authorization checks and retention/deletion exercises before production use. |
+| Employee result data is exposed too broadly | Maintain tested owner-scoped and admin-only access, and retain only necessary data before real identities are introduced. | Authorization, tenant-isolation, and retention/deletion exercises before production use. |
 
 Operational signals should include ingestion stage and outcome, version activation outcome, index verification, retrieval document IDs, citation lineage, quiz publication and grading outcomes, and reconciliation drift. Do not report a stage as healthy without evidence from its actual state.
 
@@ -188,8 +188,8 @@ Operational signals should include ingestion stage and outcome, version activati
 | Existing foundation — Document ingestion and RAG | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | Supported source upload, lifecycle, retained source, indexing, scoped retrieval, citations, and recovery evidence as recorded in project status. This baseline does not itself establish enterprise policy versioning or employee access control. |
 | MVP 1 — Policy versions and safe retrieval | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | PostgreSQL applicability rules select eligible document IDs using `effective_from` and exclusive `effective_until`; retrieval is constrained to those IDs; activation checks indexed-chunk consistency; source citations retain document lineage. Automated coverage and local end-to-end evidence are recorded in project status. |
 | MVP 2 — Reviewed onboarding quizzes | Implemented baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | PostgreSQL stores quizzes, questions, options, attempts, and answers; quiz questions retain source document/version references; server-side grading uses stored answer keys and bounded scores. Quiz content is administered through the demo workflow; generated drafts must be reviewed before publication. |
-| MVP 3 — Onboarding experience | Implemented demo baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | The frontend provides separate training-admin and employee workspaces, policy lookup, quiz authoring/publication, employee quiz attempts/results, and training overview. This is a demo-level UI distinction, not authenticated or backend-enforced role authorization. |
-| Future — Authentication, authorization, and multi-company tenancy | Future, not MVP | Access is tenant- and role-scoped, with tested isolation before multiple companies or real employee data are supported. |
+| MVP 3 — Onboarding experience | Implemented demo baseline; see [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) | The frontend provides authenticated training-admin and employee workspaces, policy lookup, quiz authoring/publication, employee quiz attempts/results, and training overview. Backend JWT authentication and `admin`/`employee` role checks enforce the sample-company boundary. |
+| Future — Multi-company tenancy and access hardening | Future, not MVP | Access is tenant- and role-scoped with tested isolation, data minimization, retention/deletion, and production security controls before multiple companies or real employee data are supported. |
 | Future — Event processing and advanced analytics | Future, needs justification | Kafka, Spark, or additional analytics are introduced only for measured scale, latency, or product needs. |
 
 Promote a phase to implemented only when code, focused tests, and reproducible evidence exist. The current verified application capabilities and limitations belong in [`PROJECT_STATUS.md`](./PROJECT_STATUS.md), not in this target document as unverified claims.

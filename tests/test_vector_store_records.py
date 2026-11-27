@@ -1,5 +1,7 @@
 from unittest.mock import Mock, call
 
+import pytest
+
 from app.rag.vector_store import VectorStore
 from app.models.chunk import Chunk
 
@@ -181,3 +183,33 @@ def test_delete_by_chunk_ids_deletes_existing_ids_once():
             "orphan-document:1",
         ]
     )
+
+
+def test_vector_store_init_rejects_mismatched_collection_space(monkeypatch):
+    fake_collection = Mock()
+    fake_collection.metadata = {"hnsw:space": "l2"}
+    fake_client = Mock()
+    fake_client.get_or_create_collection.return_value = fake_collection
+
+    monkeypatch.setattr(
+        "app.rag.vector_store.chromadb.PersistentClient",
+        lambda path: fake_client,
+    )
+
+    with pytest.raises(RuntimeError, match="rebuild_vector_collection"):
+        VectorStore(collection_name="cloudmentor")
+
+
+def test_vector_store_init_accepts_matching_cosine_space(monkeypatch):
+    fake_collection = Mock()
+    fake_collection.metadata = {"hnsw:space": "cosine"}
+    fake_client = Mock()
+    fake_client.get_or_create_collection.return_value = fake_collection
+
+    monkeypatch.setattr(
+        "app.rag.vector_store.chromadb.PersistentClient",
+        lambda path: fake_client,
+    )
+
+    store = VectorStore(collection_name="cloudmentor")
+    assert store.collection is fake_collection

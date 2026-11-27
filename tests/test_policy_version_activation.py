@@ -5,6 +5,8 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from tests.auth_stubs import override_auth
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -478,6 +480,8 @@ def make_client(
     app.dependency_overrides[
         get_policy_version_service
     ] = lambda: service
+
+    override_auth(app)
 
     return TestClient(app)
 

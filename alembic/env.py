@@ -6,7 +6,7 @@ from app.core.config import DATABASE_URL
 
 from alembic import context
 from app.core.database import Base
-from app.db_models import Subject, Document
+from app.db_models import Subject, Document, User, ProcessingEvent  # noqa: F401
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

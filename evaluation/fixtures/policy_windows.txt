@@ -1,0 +1,6 @@
+Policy version 1 is effective from 2026-01-01 and is superseded on 2026-04-01.
+Policy version 2 is effective from 2026-04-01 and has no end date.
+The effective_until date is exclusive and is not part of the active window.
+Business dates use the Asia/Ho_Chi_Minh time zone.
+A document becomes applicable at the start of its effective_from date.
+Overlapping versions are rejected when a superseded version has no end date.
